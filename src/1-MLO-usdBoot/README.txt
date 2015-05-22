@@ -10,6 +10,7 @@ The MLO here just acts as a container for bare metal assembly code.
 
 To build: 
 1) Make sure you have built the signgp utility first.
+2) Edit build.sh script to reflect your toolchain path
 2) ./build.sh mlo
 
 To run:
