@@ -16,3 +16,4 @@ TI AM335x Cortex A8 (Sitara) Technical Ref. manual (TRM) is very much required.
 As is the BBB Sys. Ref. manual (SRM)
 
 A copy of the ARM System Developers Guide is also required to understand ARM assembly.
+Or better still use the ARM Cortex A series programmers guide - http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0013d/index.html

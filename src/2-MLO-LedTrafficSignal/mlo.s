@@ -66,7 +66,8 @@ START:
     
     /*Delay of 1s - some dummy instructions executed in a tight loop
     ALU instructions take 1 cycle to exec, branch takes 3 cycles -- see Sec 6.3 in ARM system developers guide
-    Extrapolate that to the 1ghz AM3358 processor on BBB for a loop count to get a 1s delay*/
+    During the public ROM boot, the MPU (u-processor unit) clock is set at 500Mhz, take this into consideration
+    before calculating the loop counter value below - see TRM sec 26.1.4.2*/
 DELAY:
 	ldr r8, =LOOP_CTR
 DELAY_LOOP1:
