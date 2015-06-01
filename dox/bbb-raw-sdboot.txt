@@ -1,0 +1,68 @@
+
+Me in a dragon boat, holding a paddle, wearing a t-shirt that says 'ARM Powered' on the sleeve...
+Another attempt at blogging
+ARM, open source and stuff...
+08 Aug 2014
+BeagleBone Black booting
+
+The TI Beagle development boards have a ... weird (software) boot architecture. All documentation I was able to find online for running Linux on them is based around a set of cryptic and very specific instructions to:
+
+    create a small 16-bit FAT partition at the start of the (micro)SD card
+    copy the x-loader (a file called MLO) to that FAT filesystem as the first file to be written to that filesystem after formatting
+    hope for the best
+
+Why do I care?
+
+Apart from this feeling a bit ... cargo-cultish, it poses an actual problem if one wants to not use MBR partitioning on the device - since the ROM code loading this MLO only supports that partition table format. In my case, I wanted to use GPT partitioning.
+
+Turns out there is actually a pretty easy way of doing this - only the information is not found in the Beagle docs, but in the SoC (Sitara 335x) Technical Reference Manual: In raw mode the booting image can be located at one of the four consecutive locations in the main area: offset 0x0 / 0x20000 (128KB) / 0x40000 (256KB) / 0x60000 (384KB).
+
+This ends up quite sufficient for us, as the amount of partition table space required for UEFI compatibility is only 16KB, so as long as we don't use the slot at offset 0, we're good. Also, the partitioning tools I've tried all put new partitions at an alignment of >= 2048 LBA blocks (512 bytes). This puts the first actual partition at 1MB, which gives us lots of free space at any of the three other offsets. However, why be silly? We use the 128K slot and have plenty of room.
+
+# Zero out partition tables and any pre-existing raw boot images
+$ sudo dd if=/dev/zero of=/dev/sdX bs=512K count=1
+
+# Write MLO at 128KB offset from start of microSD card /dev/sda
+$ sudo dd if=MLO of=/dev/sdX bs=128K seek=1
+
+Create a friendly MLO
+
+But ... where did that MLO come from?
+Well, MLO is only a cut-down version of U-Boot. This patch applied on top of U-Boot v2014.07 can be used to build an MLO to launch UEFI from. The patch does a few things:
+
+    Adds the platform target am335x_evm_uefi.
+    Adds CONFIG_EFI_PARTITION to MLO (referred to SPL in the code).
+    Changes the default boot filename to "boot.img" instead of "u-boot.img".
+    Uses the FAT filesystem boot mechanism even though we are booting through what is known as RAW mode, which would otherwise look for the kernel at a fixed offset.
+
+# Clone and patch u-boot
+$ git clone git://git.denx.de/u-boot.git
+$ cd u-boot
+$ git checkout -b v2014.07 v2014.07
+$ git am 0001-Hack-to-build-MLO-for-UEFI-on-BeagleBoneBlack.patch
+
+# If you're cross compiling...
+$ export CROSS_COMPILE=arm-linux-gnueabihf-
+
+# Configure platform
+$ make am335x_evm_uefi_config
+
+# Build u-boot (and MLO)
+$ make -j4
+
+Create your boot media
+
+Now partition a uSD card in GPT format using, for example, gdisk - making sure the first partition is some kind of FAT. Then write MLO to the card as described above, copy a firmware image (for example the UEFI port underway by Varad) into the FAT partition as boot.img. Insert into BBB, hold down the "user boot" button and power on the board. It should launch the boot image automatically.
+
+When I have some time, I'll put together a method for performing a "raw" boot from the eMMC, to get rid of the need to keep holding that button.
+
+posted at: 13:37 | path: /uefi | permanent link to this entry
+Me
+Blogs
+Planet Linaro
+Resources
+Linaro UEFI
+
+RSS feed
+Valid XHTML 1.0 Transitional Valid CSS! powered by blosxom
+

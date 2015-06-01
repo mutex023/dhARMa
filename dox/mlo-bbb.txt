@@ -1,0 +1,53 @@
+Writing an MLO for a BeagleBoard XM
+
+by Andrew Murray on July 10, 2011 in BeagleBoard, Linux, Programming
+
+Before I started playing with the BeagleBoard XM I’ve had never booted a board directly from an MMC card and I didn’t have a clue what an ‘MLO’ file was. After some research on the internet it seemed apparent that it was used in place of the traditional first stage boot loader: XLoader. In fact it in most cases it is XLoader – a quick invocation of my toolchain’s string implementation seemed to correlate with this:
+1	$ arm-none-linux-gnueabi-strings /media/boot/MLO | grep X-Loader
+2	()*+,-./0123456789:;<=>?Texas Instruments X-Loader 1.5.0 (Mar 27 2011 - 17:37:56)
+3	X-Loader hangs
+
+I was curious as to why it was named MLO, how the board boots into this Image and how I can create my own MLO with some bare metal code. This post answers these questions and results in a very simple executable MLO file. It will probably satisfy those readers who like to understand and write all the code that runs on a board. It’s very easy to use a boot loader like UBoot to obtain and execute an image from an MMC card – but it adds boot time, duplication and complexity. Besides it’s fun to get close to the metal…
+
+Why an ‘MLO’ and how does it boot?
+
+Like many TI SOCs the DM3730 (BeagleBoard XM SOC) contains a ROM – upon a reset release the reset exception starts executing ROM code. The purpose of the ROM is to perform some very basic system configuration and to ultimately find and boot from a device such as flash or an MMC card (This is why it’s sometimes known as an ROM Boot Loader or RBL). It overcomes the chicken-and-egg problem of being unable to boot from a device because nothing has performed required initialisation of that device. The DM3730 is a fairly complex device and can boot from a wide range of devices with various configurations – as a result the ROM is also complex. This particular ROM has enough functionality to understand FAT filesystems on an MMC card, perform boot from a UART device, it can even boot from a USB device. The key to really understanding all of this on the DM3730 is to read Chapter 26 of the Technical Reference Manual (TRM).
+
+When the device is powered on a set of boot pins (sys_boot) are held high or low to indicate to the ROM a list of devices to boot from (a bit like a PC BIOS). One can only assume that the BeagleBoard manufactures have set these appropriately to include MMC booting. As a result of this – during power on the ROM will initialise the MMC/SD device, detect a card and look for a boot image. The ROM is capable of reading from an MMC card with or without a filesystem. In the case of a filesystem it will search for a file named ‘MLO’ which should be located in the root directory on an active partition of type FAT12/16 or FAT32. So this explains why we name Xloader MLO.
+
+However, just renaming an x-load.bin file to MLO isn’t enough. As an MMC device is not capable of executing-in-place (XIP), a header much be appended onto the image which tells the ROM where to copy the image to (usually somewhere in SRAM) and how big the image is. The header is very straightforward and just consists of the first 4 bytes being the size of the image and the last 4 bytes being the destination address. You may have come across the signGP utility before – the signGP utility creates such headers – but usually postpends the output file name with .ift – rather than naming it MLO.
+
+The ROM also supports an optional header – which allows you to specify additional options such as adjusting the clock frequencies, SRAM settings, MMC Interface settings, etc – read the TRM for more information on this.
+
+Creating your own MLO
+
+I wanted to create my own MLO – effectively a container for bare metal code. To do this I need some code to run, how about this:
+1	.global start
+2	start:
+3	    mov r0, #0
+4	    mov r1, #1
+5	    mov r2, #2
+6	    mov r3, #3
+7	    mov r4, #4
+8	    b   start
+
+A very simple bit of assembler that does nothing but continually sets the value of registers 0 to 4. To build an MLO I invoke the following:
+1	$ arm-none-linux-gnueabi-gcc test.S -nostdlib -e start -Ttext=0x40200800
+2	$ arm-none-linux-gnueabi-objcopy -O binary a.out a.bin
+3	$ ./signGP a.bin
+4	$ mv a.bin.ift MLO
+
+Let’s explain what’s going on here. I start by using GCC to build my assembler file – I tell it not to include any standard libraries (-nostdlib). I tell it where the entry point of my application is (-e) (as there is no main or standard libraries). And finally I ensure that the program is linked to run at the address which we intend to load it – this address is somewhere safe in SRAM.
+
+I then convert the ELF file that GCC creates into a binary file – in other words I strip out anything that isn’t executable code. I then use the signGP program to prepend a suitable header (please note signGP by default uses 0×40200800 as a default load address). I then rename the output to MLO. To verify this looks right, I did the following:
+1	$ ls -la a.bin
+2	$ hexdump MLO
+3	0000000 0018 0000 0800 4020 0000 e3a0 1001 e3a0
+4	0000010 2002 e3a0 3003 e3a0 4004 e3a0 fff9 eaff
+5	0000020
+
+You may notice – the first 4 bytes are 0×18 – which is the size of a.bin. The next 4 bytes are 0×40200800 which is the load address. The remaining bytes are the executable image. Great – let’s put this on an MMC card, reboot the board and see what happens when we break into the board with the JTAG (Please see my last post for how to connect to the BeagleBoard XM with a JTAG device).
+
+MLO seen running inside Code Composer Studio
+
+As you can see from the image above – when I break into the board I can see my code in the disassembly window and the processor registers are as expected. Fantastic! As you may expect I wasn’t fortunate to get this right on my first attempt – fortunately the ROM can help here too – it contains a number of ‘dead loops’ – when something goes wrong such as an invalid header it will execute a tight loop at a known address. These are documented in the TRM and provide a good indication as to what is going on

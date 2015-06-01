@@ -1,0 +1,14 @@
+Boot Partition (omap4+ (am335x))
+
+MLO/u-boot: dd'ed to drive:
+
+sudo dd if=MLO of=/dev/sdX count=1 seek=1 conv=notrunc bs=128k
+sudo dd if=u-boot.img of=/dev/sdX count=2 seek=1 conv=notrunc bs=384k
+
+Boot:
+
+xMb fat16/ext2 (unmounted usually shared as a usb gadget)
+/uEnv.txt (priority 1) (Optional)
+/boot.scr (priority 2) (Optional, For: debian-installer: flash-kernel)
+/boot/boot.scr (priority 3) (Optional, For: debian-installer: flash-kernel)
+

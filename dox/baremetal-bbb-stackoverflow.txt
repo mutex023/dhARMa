@@ -1,0 +1,84 @@
+
+
+Absolutely no problem...
+
+First off get the serial port up and running, I have one of the older/earlier beagleboards and remember the serial port and just about everything about the I/O being painful, nevertheless get a serial port on it so you can see it boot.
+
+It boots uboot I think and you can press a key or esc or something like that to interrupt the normal boot (into linux). From the uboot prompt it is easy to load your first simple programs.
+
+I have some beagleboard code handy at the moment but dont have my beagleboard itself handy to try them. So go to http://sam7stuff.blogspot.com/ to get an idea of how to mix some startup assembler and C code for OSless embedded programs (for arm, I have a number of examples out there for other thumb/cortex-m3 platforms, but those boot a little differently).
+
+The sam7 ports for things and memory address space is totally different from the beagleboard/omap. The above is a framework that you can change or re-invent.
+
+You will need the OMAP 35x techincal reference manual from ti.com. Search for the omap part on their site OMAP3530.
+
+Also the beagleboard documentation. For example this statement:
+
+A single RS232 port is provided on the BeagleBoard and provides access to the TX and RX lines of UART3
+
+So in the trm for the omap searching for UART3 shows that it is at a base address of 0x49020000. (often it is very difficult to figure out the entire address for something as the manuals usually have part of the memory map here, and another part there, and near the register descriptions only the lower few bits of the address are called out.)
+
+Looking at the uart registers THR_REG is where you write bytes to be sent out the uart, note that it is a 16 bit register.
+
+Knowing this we can make the first program:
+
+.globl _start
+_start:
+    ldr r0,=0x49020000
+    mov r1,#0x55
+    strh r1,[r0]
+    strh r1,[r0]
+    strh r1,[r0]
+    strh r1,[r0]
+    strh r1,[r0]
+hang: b hang
+
+Here is a makefile for it:
+
+ARMGNU = arm-none-linux-gnueabi
+
+AOPS = --warn --fatal-warnings
+COPS = -Wall -Werror -O2 -nostdlib -nostartfiles -ffreestanding 
+
+uarttest.bin : uarttest.s
+    $(ARMGNU)-as $(AOPS) uarttest.s -o uarttest.o
+    $(ARMGNU)-ld -T rammap uarttest.o -o uarttest.elf
+    $(ARMGNU)-objdump -D uarttest.elf > uarttest.list
+    $(ARMGNU)-objcopy uarttest.elf -O srec uarttest.srec
+    $(ARMGNU)-objcopy uarttest.elf -O binary uarttest.bin
+
+And the linker script that is used:
+
+/* rammap */
+MEMORY
+{
+    ram : ORIGIN = 0x80300000, LENGTH = 0x10000
+}
+
+SECTIONS
+{
+    .text : { *(.text*) } > ram
+}
+
+Note the linux version from codesourcery is called out, you do not need that version of a gnu cross compiler, in fact this code being asm only needs an assembler and linker (binutils stuff). The arm-none-eabi-... type cross compiler will work as well (assuming you get the lite tools from codesourcery).
+
+Once you have a .bin file look at the help on uboot, I dont remember the exact command but it is probably an l 0x80300000 or load_xmodem or some such thing. Basically you want to x, or y or z modem the .bin file over the serial port into memory space for the processor, then using a go or whatever the command is tell uboot to branch to your program.
+
+You should see a handful of U characters (0x55 is 'U') come out the serial port when run.
+
+Your main goal up front is to get a simple serial port routine up so you can print stuff out to debug and otherwise see what your programs are doing. Later you can get into graphics, etc. but first use the serial port.
+
+There was some cheating going on. Since uboot came up and initialized the serial port we didnt have to, just shove bytes into the thr. but quickly you will overflow the thr's storage and lose bytes, so you then need to read the trm for the omap and find some sort of bit that indicates the transmitter is empty, it has transmitted everything, then create a uart_send type function that polls for transmitter empty then sends the one byte out.
+
+also forget about printf(), you need to create your own print a number (octal or hex are the easiest) and perhaps print string. I do this sort of work all day and all night and 99% of the time all I use is a small routine that prints 32 bit hex numbers out the uart. from the numbers I can debug and see the status of the programs.
+
+So take the sam7 model or something like it (note the compiler and linker command line options are important as is the order of files on the link command line, the first file has to be your entry point if you want to have the first instruction/word in the .bin file be your entry point, which is usually a good idea as down the road you want to know how to control this for booting from a rom).
+
+You can probably do quite a bit without removing or replacing uboot, if you start to look at the linux based boot commands for uboot you will see that it is copying what is pretty much a .bin file from flash or somewhere into a spot in ram, then branching to it. Now branching to linux, esp arm linux involves some arm tables and possible setting up some registers, where your programs wont want or need that. basically whatever command you figure out to use, after you have copied your program to ram, is what you will script in a boot script for uboot should you choose to have the board boot and run like it does with linux.
+
+Saying that you can use jtag and not rely on uboot to work, when you go that path though there are likely a certain number of things you have to do on boot to get the chip up and running, in particular configuring the uart is likely a few clock dividers somewhere, clock enables, I/O enables, various things like that. Which is why the sam7 example starts with a blink the led thing instead of a uart thing. The amotek jtag-tiny is a good jtag wiggler, I have been quite pleased, use these all day long every day at work. The beagleboard probably uses a TI pinout and not the standard ARM pinout so you will likely need to change the cabling. And I dont know if the OMAP gives you direct access to the arm tap controller or if you have to do something ti specific. You are better off just going the uboot route for the time being.
+
+Once you have a framework where you have a small amount of asm to setup the stack and branch to your entrypoint C code, you can start to turn that C code into an OS or do whatever you want. If you look at chibios or prex or others like it you will find they have small asm boot code that gets them into their system. Likewise there are uart debug and non-debug routines in there. Many rtoses are going to want to use interrupts and not poll for thr to be empty.
+
+If this post doesnt get you up and running with your hello world (letting you do some of the work), let me know and i will dig out my beagleboard and create a complete example. My board doesnt exactly match yours but as far as hello world goes it should be close enough.
+

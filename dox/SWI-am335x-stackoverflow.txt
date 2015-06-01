@@ -1,0 +1,247 @@
+ 1
+down vote
+favorite
+1
+	
+
+I'm starting to write a toy OS for the BeagleBone Black, which uses an ARM Cortex-A8-based TI Sitara AM3359 SoC and the U-Boot bootloader. I've got a simple standalone hello world app writing to UART0 that I can load through U-Boot so far, and now I'm trying to move on to interrupt handlers, but I can't get SWI to do anything but hang the device.
+
+According to the AM335x TRM (starting on page 4099, if you're interested), the interrupt vector table is mapped in ROM at 0x20000. The ROM SWI handler branches to RAM at 0x4030ce08, which branches to the address stored at 0x4030ce28. (Initially, this is a unique dead loop at 0x20084.)
+
+My code sets up all the ARM processor modes' SP to their own areas at the top of RAM, and enables interrupts in the CPSR, then executes an SWI instruction, which always hangs. (Perhaps jumping to some dead-loop instruction?) I've looked at a bunch of samples, and read whatever documentation I could find, and I don't see what I'm missing.
+
+Currently my only interaction with the board is over serial connection on UART0 with my linux box. U-Boot initializes UART0, and allows loading of the binary over the serial connection.
+
+Here's the relevant assembly:
+
+.arm
+.section ".text.boot"
+
+.equ usr_mode,          0x10
+.equ fiq_mode,          0x11
+.equ irq_mode,          0x12
+.equ svc_mode,          0x13
+.equ abt_mode,          0x17
+.equ und_mode,          0x1b
+.equ sys_mode,          0x1f
+
+.equ swi_vector,        0x4030ce28
+
+.equ rom_swi_b_addr,    0x20008
+.equ rom_swi_addr,      0x20028
+.equ ram_swi_b_addr,    0x4030CE08
+.equ ram_swi_addr,      0x4030CE28
+
+.macro setup_mode mode, stackpointer
+    mrs r0, cpsr
+    mov r1, r0
+    and r1, r1, #0x1f
+    bic r0, r0, #0x1f
+    orr r0, r0, #\mode
+    msr cpsr_csfx, r0
+    ldr sp, =\stackpointer
+    bic r0, r0, #0x1f
+    orr r0, r0, r1
+    msr cpsr_csfx, r0
+.endm
+
+.macro disable_interrupts
+    mrs r0, cpsr
+    orr r0, r0, #0x80
+    msr cpsr_c, r0
+.endm
+
+.macro enable_interrupts
+    mrs r0, cpsr
+    bic r0, r0, #0x80
+    msr cpsr_c, r0
+.endm
+
+.global _start
+_start:
+    // Initial SP
+    ldr r3, =_C_STACK_TOP
+    mov sp, r3
+
+    // Set up all the modes' stacks
+    setup_mode fiq_mode, _FIQ_STACK_TOP
+    setup_mode irq_mode, _IRQ_STACK_TOP
+    setup_mode svc_mode, _SVC_STACK_TOP
+    setup_mode abt_mode, _ABT_STACK_TOP
+    setup_mode und_mode, _UND_STACK_TOP
+    setup_mode sys_mode, _C_STACK_TOP
+
+    // Clear out BSS
+    ldr r0, =_bss_start
+    ldr r1, =_bss_end
+    mov r5, #0
+    mov r6, #0
+    mov r7, #0
+    mov r8, #0
+
+    b _clear_bss_check$
+
+_clear_bss$:
+    stmia r0!, {r5-r8}
+
+_clear_bss_check$:
+    cmp r0, r1
+    blo _clear_bss$
+
+    // Load our SWI handler's address into
+    // the vector table
+    ldr r0, =_swi_handler
+    ldr r1, =swi_vector
+    str r0, [r1]
+
+    // Debug-print out these SWI addresses
+    ldr r0, =rom_swi_b_addr
+    bl print_mem
+
+    ldr r0, =rom_swi_addr
+    bl print_mem
+
+    ldr r0, =ram_swi_b_addr
+    bl print_mem
+
+    ldr r0, =ram_swi_addr
+    bl print_mem
+
+    enable_interrupts
+
+swi_call$:
+    swi #0xCC
+    bl kernel_main
+    b _reset
+
+
+.global _swi_handler
+_swi_handler:
+    // Get the SWI parameter into r0
+    ldr r0, [lr, #-4]
+    bic r0, r0, #0xff000000
+
+    // Save lr onto the stack
+    stmfd sp!, {lr}
+    bl print_uint32
+    ldmfd sp!, {pc}
+
+Those debugging prints produce the expected values:
+
+00020008: e59ff018
+00020028: 4030ce08
+4030ce08: e59ff018
+4030ce28: 80200164
+
+(According to objdump, 0x80200164 is indeed _swi_handler. 0xe59ff018 is the instruction "ldr pc, [pc, #0x20]".)
+
+What am I missing? It seems like this should work.
+arm interrupt beagleboard cortex-a
+shareimprove this question
+	
+edited Apr 9 '14 at 18:05
+artless noise
+9,09542955
+	
+asked Jul 15 '13 at 23:17
+justinian
+1155
+	
+   	 
+	
+What is SWI CC supposed to do? Perhaps it requires registers or modes set a certain way? Just guessing as without a debugger, you are going to have a hard time seeing exactly what has occurred. –  Michael Dorgan Jul 15 '13 at 23:41
+   	 
+	
+Yeah, sadly I don't have a JTAG debugger. SWI ignores its argument, and causes a software interrupt, which jumps to the corresponding location in the interrupt vector table. So supposedly, it should hit the branch in the ROM table to the RAM table, then branch to _swi_handler. The 0xCC value I was passing it is just for testing purposes - the first two instructions in _swi_handler should load the SWI instruction into r0, and clear out SWI leaving just the argument. –  justinian Jul 16 '13 at 0:12
+   	 
+	
+Who knows? We need to see the value at 0x0 of the board (or where ever the real vector is). On the ARM, it is not a vector table, but vector code. I don't know if this has any relevance. How does 0x0+swi_offset get to your routine? I would toggle a GPIO to know it was getting to the routine. Cortex processors allow mapping the exception table to values other than 0x0 and 0xffff0000. –  artless noise Jul 16 '13 at 0:33
+   	 
+	
+Right, like I said, the table is at 0x20008, which as the debug out shows, is a branch to [0x20028], or 0x4030ce08. Likewise, 0x4030ce08 is a jump to [0x4030ce28], which contains the address to my handler, 0x80200164. Toggling a GPIO is a good idea.. that's even simpler than the serial message I've currently got. –  justinian Jul 16 '13 at 7:33
+1 	 
+	
+Make the GPIO toggle as simple as possible. Load every register explicitly and don't use a stack or any memory. Either your SWI handler doesn't get control, or the environment is not right. Sometime stating the obvious is helpful ;-) –  artless noise Jul 16 '13 at 14:42
+add a comment
+2 Answers
+active
+oldest
+votes
+up vote
+1
+down vote
+accepted
+	
+
+The firmware on the board changes the ARM execution mode and the locations of the vector tables associated with the various modes. In my own case (a bare-metal snippet code executed at Privilege Level 1 and launched by BBB's uBoot) the active vector table is at address 0x9f74b000.
+
+In general, you might use something like the following function to locate the active vector table:
+
+static inline unsigned int *get_vectors_address(void)
+{
+    unsigned int v;
+
+    /* read SCTLR */
+    __asm__ __volatile__("mrc p15, 0, %0, c1, c0, 0\n"
+            : "=r" (v) : : );
+    if (v & (1<<13))
+        return (unsigned int *) 0xffff0000;
+    /* read VBAR */
+    __asm__ __volatile__("mrc p15, 0, %0, c12, c0, 0\n"
+            : "=r" (v) : : );
+    return (unsigned int *) v;
+}
+
+shareimprove this answer
+	
+edited May 11 '14 at 8:16
+
+	
+answered May 11 '14 at 7:32
+Marco Cesati
+262
+	
+   	 
+	
+Ahh. I had assumed since I was still bringing up the CPU that the vector table would still be at the address in the TRM, so I wasn't checking VBAR at all. Thanks! I had been pulled away from this project by other projects, but I'll go back and give this a try tonight. Thanks! –  justinian May 12 '14 at 16:26
+add a comment
+up vote
+1
+down vote
+	
+
+change
+
+ldr r0, [lr, #-4]
+bic r0, r0, #0xff000000
+stmfd sp!, {lr}
+bl print_uint32
+ldmfd sp!, {pc}
+
+to
+
+stmfd sp!, {r0-r3, r12, lr}
+ldr r0, [lr, #-4]
+bic r0, r0, #0xff000000
+bl print_uint32
+ldmfd sp!, {r0-r3, r12, pc}^
+
+PS: You don't restore SPSR into CPSR of interrupted task AND you also scratch registers which are not banked by the cpu mode switch.
+shareimprove this answer
+	
+answered Aug 5 '13 at 20:05
+user1075375
+5781618
+	
+   	 
+	
+Thanks. This wasn't my current problem, but I'm sure it would have been a problem eventually. –  justinian Aug 6 '13 at 22:59
+   	 
+	
+Hmm, Since it is a cortex-A8 cpu, have you tried meddling with VBAR register and creating your own vector table ? See "3.2.68. c12, Secure or Nonsecure Vector Base Address Register" in cortex-A8 TRM. Online version: infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0344k/… –  user1075375 Aug 8 '13 at 14:47
+   	 
+	
+this only works for arm based swi calls not thumb based... –  dwelch Apr 10 '14 at 1:37
+   	 
+	
+yes, I assumed ARM only because of OP's hardcoded lr delta and he doesn't mention thumb anywhere. –  user1075375 Apr 11 '14 at 4:29 
