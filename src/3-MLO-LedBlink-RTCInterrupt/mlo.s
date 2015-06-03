@@ -8,7 +8,6 @@ has been referred/used here.
 .equ LOAD_ADDR, 0x402f0400
 
 .equ STACK_SIZE, 256
-//.equ STACK_SUPERVISOR_START, 0x4030B7EA	@16 bytes below the public stack -- TRM 26.1.3.2
 .equ STACK_SUPERVISOR_START, 0x4030CDFC
 
 .equ CM_PER_GPIO1_CLKCTRL, 0x44e000AC
@@ -56,7 +55,7 @@ has been referred/used here.
 _start:
     mrs r0, cpsr
     bic r0, r0, #0x1F	@ clear mode bits
-    orr r0, r0, #0x13	@ set SVC mode - supervisor mode
+    orr r0, r0, #0x13	@ set supervisor mode
     orr r0, r0, #0xC0	@ disable FIQ and IRQ
     msr cpsr, r0    
     
@@ -96,7 +95,7 @@ _start:
     ldr r1, =0x02
     str r1, [r0]
 
-    /*clear out gpio1-21st pin using data out register first*/
+    /*clear out gpio1-21,22,23,24 pins using data out register first*/
     ldr r0, =GPIO1_CLEARDATAOUT
     mov r1, #(0x0F<<21)
     str r1, [r0]
@@ -281,7 +280,8 @@ PROC_LEDON:
 @currently unused    
 NO_HDLR:
 	b NO_HDLR
-    
+
+@currently unused     
 INTVEC_TABLE:
 		b     _start    		/* reset - _start  		*/
         ldr   pc, NO_HDLR       /* undefined - _undf    */
