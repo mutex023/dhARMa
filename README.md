@@ -17,5 +17,7 @@ As is the BBB Sys. Ref. manual (SRM)
 
 The following documents are required to code/understand ARM assembly:
 [1] ARM System Developers Guide
+
 [2] ARM Cortex A series programmers guide - http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0013d/index.html
+
 [3] ARM v7-A Architecture Reference Manual - http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0406c/index.html
