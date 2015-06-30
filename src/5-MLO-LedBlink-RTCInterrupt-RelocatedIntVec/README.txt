@@ -1,9 +1,8 @@
 3-MLO-LedBlink-RTCInterrupt
 ===========================
-The next logical step to "2".
-Instead of using a delay loop we use the real time clock (RTC) on board BBB
-to generate a 1-second interrupt and write our own custom IRQ handler
-which just toggles the usr0 led.
+The next logical step to "4".
+We use a custom interrupt vector table relocated at a custom internal OCMC RAM location using the VBAR register
+to handle RTC interrupt.
 
 To build: 
 1) Make sure you have built the signgp utility first.

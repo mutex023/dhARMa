@@ -131,7 +131,7 @@ _start:
     ldr r1, =LOAD_ADDR
     add r0, r1
     ldr r2, =INTVEC_TABLE_BASE
-
+	
     @Calculate the absolute 32-bit address of the custom IRQ handler and NO_HDLR and store it in a memory word at the end of the intvec table
     ldr r5, =IRQ_HDLR
     add r5, r1
@@ -139,7 +139,8 @@ _start:
     ldr r5, =NO_HDLR
     add r5, r1
     str r5, [r0, #36]
-            
+    
+    
     @copy the intvec table, irq handler address and NO_HDLR address to the custom address    
     mov r3, #10
 COPY_LOOP:
@@ -150,10 +151,11 @@ COPY_LOOP:
 	subs r3, #1
 	bne COPY_LOOP        
     
-    @set usr2 led on to indicate copy finished
+    @set usr2 led on to indicate copy finished successfully
     mov r7, #2
     bl PROC_LEDON
-        
+
+SKIP:
     /*
     NOTE: Setting VBAR is required if you decide to relocate your vector table to an address
     other than the one provided by the initial boot code.
@@ -201,8 +203,12 @@ NEXT:
     ldr r0, =RTC_OSC_REG
     mov r1, #(1<<6)
     str r1, [r0]
-    
-    
+
+       
+    ldr r8, =GPIO1_DATAOUT
+    mov r9, #(1<<21)
+	
+        
     @must wait for RTC BUSY period to end before enabling RTC timer interrupt -- TRM 20.3.5.15/16
 WAIT_BUSY:
     ldr r0, =RTC_STATUS_REG
@@ -227,7 +233,7 @@ WAIT_BUSY:
     add r1, r2
     str r1, [r0]      
     */
-    
+        
     @finally enable interrupts on ARM side
     mrs r0, cpsr
     bic r0, r0, #0x80	@ disable FIQ, but enable IRQ
@@ -237,6 +243,7 @@ WAIT_BUSY:
     ldr r0, =INTC_MIR2_CLEAR
     mov r1, #(0x01<<11)
     str r1, [r0]
+
    
 END:
     nop
@@ -245,7 +252,7 @@ END:
 
 @see TRM 6.2.2
 IRQ_HDLR:
-
+	
   @save return address
   mov r4, lr  
   
@@ -280,7 +287,7 @@ IRQ_HDLR:
   eor r1, r1, #(1<<21)
   str r1, [r0]
   
- INT_XIT:
+INT_XIT:
   @allow pending/new IRQ's to occur
   ldr r0, =INTC_CTRL
   mov r1, #1
@@ -323,8 +330,8 @@ INTVEC_TABLE:
         ldr pc, [pc, #20]     	/* program abort - _pabt*/
         ldr pc, [pc, #16]     	/* data abort - _dabt   */
         nop					    /* reserved             */
-        ldr pc, [pc, #4]        /* IRQ - read the vector number   */
-        ldr pc, [pc, #4]        /* FIQ - _fiq           */    
-     	nop						/* dummy - used to store absolute 32-bit addr. of IRQ handler */
-     	nop						/* dummy - used to store absolute 32-bit addr. of NO_HDLR     */     	
-    
+		ldr pc, [pc, #0]		/* IRQ - branch to IRQ_HDLR address stored at dummy1  -- PC always points to current instr. + 8 bytes */      		
+        ldr pc, [pc, #0]        /* FIQ - _fiq           */    
+     	nop						/* dummy1 - used to store absolute 32-bit addr. of IRQ handler */
+     	nop						/* dummy2 - used to store absolute 32-bit addr. of NO_HDLR     */     	
+
