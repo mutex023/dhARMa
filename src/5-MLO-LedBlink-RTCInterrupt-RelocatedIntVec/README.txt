@@ -1,8 +1,8 @@
-3-MLO-LedBlink-RTCInterrupt
-===========================
+5-MLO-LedBlink-RTCInterrupt-RelocatedIntVec
+===========================================
 The next logical step to "4".
-We use a custom interrupt vector table relocated at a custom internal OCMC RAM location using the VBAR register
-to handle RTC interrupt.
+We use a custom interrupt vector table relocated using the VBAR register to a location in the
+internal RAM to handle the RTC 1-sec interrupt and blink usr0 led.
 
 To build: 
 1) Make sure you have built the signgp utility first.

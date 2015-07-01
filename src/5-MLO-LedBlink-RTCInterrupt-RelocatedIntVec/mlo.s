@@ -36,7 +36,7 @@ has been referred/used here.
 .equ INT_VEC_BASE_RAM, 0x4030CE00
 .equ INT_VEC_BASE_ROM, 0x20000
 .equ INT_IRQ_DEFAULT_HDLR, 0x4030CE18
-.equ INTVEC_TABLE_BASE, 0x4030FD00
+.equ INTVEC_TABLE_BASE, 0x4030FD00	
 
 .equ RTC_CTRL_REG, 0X44E3E040
 .equ RTC_STATUS_REG, 0X44E3E044
@@ -166,7 +166,7 @@ SKIP:
     bic r0, #(1 << 13)     		 @ V = 0 -- set this bit to zero to relocate interrupt table
 	mcr p15, #0, r0, c1, c0, #0    @ Write CP15 SCTRL Register
 	ldr r0, =INTVEC_TABLE_BASE
-    mcr p15, #0, r0, c12, c0, #0   @ Set VBAR 
+    mcr p15, #0, r0, c12, c0, #0   @ Set VBAR -- note that the last 5 bits of the address MUST be zero -- sec B4.1.156 in ARMv7-A-R Arch. Ref. Manual
     
     @Just verify if the VBAR is set correctly
     mrc p15, #0, r3, c12, c0, #0
@@ -250,9 +250,10 @@ END:
     b END
     
 
-@see TRM 6.2.2
-IRQ_HDLR:
-	
+/*
+The IRQ handler -- see TRM 6.2.2 for more details on how to implement an IRQ/interrupt handler
+*/
+IRQ_HDLR:	
   @save return address
   mov r4, lr  
   
@@ -318,19 +319,27 @@ PROC_LEDON:
     str r5, [r0] 
     mov pc, lr
 
-@currently unused    
+/*
+Default interrupt handler, just a dead loop
+*/
 NO_HDLR:
 	b NO_HDLR
 
-@currently unused     
+/*
+The custom interrupt vector table.
+Currently handles only IRQ, other interrupts result in a jump to NO_HDLR where
+the processor will simply execute a dead loop.
+The addresses of the IRQ handler and the default handler are stored in two 32-bit words at the end of this
+table so that pc relative addressing can be used to execute the jump.
+*/
 INTVEC_TABLE:
-		ldr pc, [pc, #32]    	/* reset - _start  		*/
-        ldr pc, [pc, #28]       /* undefined - _undf    */
-        ldr pc, [pc, #24]       /* SWI - _swi           */
-        ldr pc, [pc, #20]     	/* program abort - _pabt*/
-        ldr pc, [pc, #16]     	/* data abort - _dabt   */
+		ldr pc, [pc, #28]    	/* reset - _start  		*/
+        ldr pc, [pc, #24]       /* undefined - _undf    */
+        ldr pc, [pc, #20]       /* SWI - _swi           */
+        ldr pc, [pc, #16]     	/* program abort - _pabt*/
+        ldr pc, [pc, #12]     	/* data abort - _dabt   */
         nop					    /* reserved             */
-		ldr pc, [pc, #0]		/* IRQ - branch to IRQ_HDLR address stored at dummy1  -- PC always points to current instr. + 8 bytes */      		
+		ldr pc, [pc, #0]		/* IRQ - branch to IRQ_HDLR address stored at dummy1  -- PC always points to current instr. + 8 bytes due to historical reasons related to pipelining*/      		
         ldr pc, [pc, #0]        /* FIQ - _fiq           */    
      	nop						/* dummy1 - used to store absolute 32-bit addr. of IRQ handler */
      	nop						/* dummy2 - used to store absolute 32-bit addr. of NO_HDLR     */     	
