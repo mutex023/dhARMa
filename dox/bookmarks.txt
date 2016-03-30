@@ -17,4 +17,4 @@ https://balau82.wordpress.com/2010/02/14/simplest-bare-metal-program-for-arm/
 http://processors.wiki.ti.com/index.php/AM335x_EMIF_Configuration_tips
 http://processors.wiki.ti.com/index.php/AM335x_board_bringup_tips#DDR_configuration
 http://stackoverflow.com/questions/17665505/why-does-my-swi-instruction-hang-beaglebone-black-arm-cortex-a8-cpu
-
+http://www.jariellecatbagan.com/the-theory-behind-external-ddr3-initialization-on-the-beaglebone-black/
