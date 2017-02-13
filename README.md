@@ -11,6 +11,7 @@ being written from scratch. This is going to be a life long
 project to gain inner satisfaction and learn a lot about embedded OS programming.
 
 Get the ARM cross compiler toolchain from here : https://launchpad.net/gcc-arm-embedded
+(Also here - http://elinux.org/ARMCompilers)
 
 The TI AM335x Cortex A8 (Sitara) Technical Ref. manual (TRM) is very much required.
 
