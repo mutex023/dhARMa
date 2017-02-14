@@ -5,6 +5,7 @@ Some code from - https://github.com/auselen/down-to-the-bone/tree/master/baremet
 has been referred/used here.
 */
 
+/* The load address is hardcoded in the signGP utility to be the start of the internal SRAM*/
 .equ LOAD_ADDR, 0x402f0400
 
 .equ STACK_SIZE, 256
@@ -27,7 +28,7 @@ has been referred/used here.
 .equ INTC_ISR_CLEAR0, 0x48200094
 .equ INTC_MIR2, 0x482000C4
 .equ INTC_MIR2_CLEAR, 0x482000C8
-.equ INTC_MIR0_CLEAR, 0x48200088
+.equ INTC_MIR2_SET, 0x482000CC
 .equ INTC_ILR75, 0X4820022C	@4h offset for each register 100h - 2fch 
 .equ INTC_SIR_IRQ, 0X48200040
 .equ INTC_IRQ_PRIORITY, 0x48200060
@@ -69,7 +70,7 @@ _start:
     
     @switch to undefined exception mode and setup undefined exception stack
     mrs r1, cpsr
-	bic r0, r0, #0x1B	    
+    bic r0, r0, #0x1B	    
     orr r1, r1, #0x12
     msr cpsr, r1
     sub r0, r0, #STACK_SIZE
@@ -77,15 +78,15 @@ _start:
 
     @switch to irq mode and setup irq stack -- ARM sys dev guide -- 9.2.4
     mrs r1, cpsr
-	bic r0, r0, #0x1F	    
+    bic r0, r0, #0x1F	    
     orr r1, r1, #0x12
     msr cpsr, r1
     sub r0, r0, #STACK_SIZE
     mov sp, r0   
 	
-	@back to supervisor mode
-	mrs r1, cpsr
-	bic r0, r0, #0x1F	
+    @back to supervisor mode
+    mrs r1, cpsr
+    bic r0, r0, #0x1F	
     orr r1, r1, #0x13
     msr cpsr, r1
     */
@@ -126,11 +127,11 @@ _start:
     other than the one provided by the initial boot code.
     
     @Set the interrupt vector base address via the sysctrl register -- CortexA series prog guide 3.1.4
-    mrc p15, 0, r0, c1, c0, 0    @ Read CP15 SCTRL Register
-    bic r0, #(1 << 13)     		 @ V = 0
-	mcr p15, 0, r0, c1, c0, 0    @ Write CP15 SCTRL Register
-	ldr r0, =INTVEC_BASE_RAM	
-    mcr p15, 0, r0, c12, c0, 0   @ Set VBAR 
+    mrc p15, 0, r0, c1, c0, 0   @ Read CP15 SCTRL Register
+    bic r0, #(1 << 13)          @ V = 0
+    mcr p15, 0, r0, c1, c0, 0   @ Write CP15 SCTRL Register
+    ldr r0, =INTVEC_BASE_RAM	
+    mcr p15, 0, r0, c12, c0, 0  @ Set VBAR 
     */    
     
     @Just verify if the boot rom has set the VBAR correctly to 20000h and turn on usr led -- TRM 26.1.3.1
@@ -139,8 +140,8 @@ _start:
     cmp r0, r1
     bne NEXT
     
-    @set usr1 led on
-    mov r7, #1
+    @set usr3 led on
+    mov r7, #3
     bl PROC_LEDON
     
 NEXT:    
@@ -212,13 +213,6 @@ END:
 @see TRM 6.2.2
 IRQ_HDLR:
 
-  @save return address
-  mov r4, lr  
-  
-  @save ctx -- currently not used
-  @stmfd sp!, {r0-r12, lr}
-  @mrs r11, spsr
-  
   @ignore spurious interrupts
   ldr r10, =INTC_SIR_IRQ
   ldr r9, [r10]
@@ -231,38 +225,44 @@ IRQ_HDLR:
   ldr r10, [r10] 
   
   @Apply the mask to get the active IRQ number
-  and r10, r10, #0x7F 
+  and r10, r10, #0x7F
   cmp r10, #75
   bne INT_XIT	@If some other interrupt, exit. (should never be the case, but still..)
   
-  @ideally we must disable RTC interrupts here before processing
-  @but since the speed of the cortex processor is quite high
-  @the handler would certainly have finished exec. before the next
-  @1-sec interrupt, so we don't bother
+	@set the interrupt mask bit for the RTC interrupt - i.e, the 11th bit in MIR2, bits0-63 are in MIR0-1 -- TRM 6.3 & 6.5.1.31
+	@i.e, disable RTC interrupts till you process current interrupt
+    ldr r0, =INTC_MIR2_SET
+    ldr r1, [r0]
+    orr r1, r1, #(0x01<<11)
+    str r1, [r0]
   
-  @toggle the usr3 LED
-  ldr r0, =GPIO1_DATAOUT
+  
+  @toggle the usr0 LED
+  ldr r0, =GPIO1_SETDATAOUT
   ldr r1, [r0]
-  eor r1, r1, #(1<<24)
+  tst r1, #(1<<21)
+  beq LEDOP
+  ldr r0, =GPIO1_CLEARDATAOUT
+
+LEDOP:
+  mov r1, #(1<<21)
   str r1, [r0]
+  @eor r1, r1, #(1<<21)
+  @str r1, [r0]
   
  INT_XIT:
-  @allow pending/new IRQ's to occur
+	@re-enable RTC interrupts
+    ldr r0, =INTC_MIR2_CLEAR
+    ldr r1, [r0]
+    orr r1, r1, #(0x01<<11)
+    str r1, [r0]
+    
+  @allow pending/new IRQ's to occur, i.e re-enable ARM interrupts
   ldr r0, =INTC_CTRL
   mov r1, #1
   str r1, [r0]
 
-  @data sync barrier -- dunno what this is, need to research
-  mcr p15, #0, r0, c7, c10, #4
-
-  @restore ctx
-  @msr spsr, r11
-  @ldmfd sp!, {r0-r12, lr}
-  
-  @restore return address
-  mov lr, r4
-  
-  @return from interrupt
+  @return from interrupt -- see Cortex A8 TRM from ARM, section 2.15.1
   subs pc, lr, #4
 
 
@@ -271,25 +271,26 @@ PROC_LEDON:
     add r7, r7, #21
     mov r6, #1
     mov r6, r6, lsl r7
-    ldr r0, =GPIO1_DATAOUT
-    ldr r5, [r0]
-    orr r5, r5, r6
-    str r5, [r0] 
+    ldr r0, =GPIO1_SETDATAOUT
+    @ldr r5, [r0]
+    @orr r5, r5, r6
+    @str r5, [r0] 
+    str r6, [r0]
     mov pc, lr
 
 @currently unused    
 NO_HDLR:
-	b NO_HDLR
+    b NO_HDLR
 
 @currently unused     
 INTVEC_TABLE:
-		b     _start    		/* reset - _start  		*/
-        ldr   pc, NO_HDLR       /* undefined - _undf    */
-        ldr   pc, IRQ_HDLR       /* SWI - _swi           */
-        ldr   pc, NO_HDLR     	/* program abort - _pabt*/
-        ldr   pc, NO_HDLR     	/* data abort - _dabt   */
-        nop                 	/* reserved             */
-        ldr   pc, IRQ_HDLR      /* IRQ - read the VIC   */
-        ldr   pc, NO_HDLR       /* FIQ - _fiq           */    
+    b     _start        /* reset - _start  		*/
+    ldr   pc, NO_HDLR   /* undefined - _undf    */
+    ldr   pc, IRQ_HDLR  /* SWI - _swi           */
+    ldr   pc, NO_HDLR   /* program abort - _pabt*/
+    ldr   pc, NO_HDLR   /* data abort - _dabt   */
+    nop                 /* reserved             */
+    ldr   pc, IRQ_HDLR  /* IRQ - read the VIC   */
+    ldr   pc, NO_HDLR   /* FIQ - _fiq           */    
      
     
