@@ -242,12 +242,6 @@ IRQ_HDLR:
 	bl PROC_LEDTOGGLE
   
  INT_XIT:
-	@re-enable RTC interrupts
-    ldr r0, =INTC_MIR2_CLEAR
-    ldr r1, [r0]
-    orr r1, r1, #(0x01<<11)
-    str r1, [r0]
-    
   @allow pending/new IRQ's to occur, i.e re-enable ARM interrupts
   ldr r0, =INTC_CTRL
   mov r1, #1
@@ -255,6 +249,16 @@ IRQ_HDLR:
 
 	@restore regs and link
 	ldmfd sp!, {r0-r11, lr}
+
+	@re-enable RTC interrupts - we should do this after the memory (stack) access on the off chance
+	@that memory is slower resulting in another interrupt before current one is handled.
+	@this scenario is observed if for example we change the stack location to the slower internal SRAM address
+	@between 0x402F0400 - 0x402FFFFF. Also keep in mind that in bare metal mode the public ROM would have set
+	@processor clock speed to only 500mhz instead of 1ghz, so the irq handler may take more than a second to exec.
+    ldr r0, =INTC_MIR2_CLEAR
+    ldr r1, [r0]
+    orr r1, r1, #(0x01<<11)
+    str r1, [r0]
 
   @return from interrupt -- see Cortex A8 TRM from ARM, section 2.15.1
   subs pc, lr, #4

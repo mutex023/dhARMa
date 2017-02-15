@@ -9,7 +9,7 @@ has been referred/used here.
 .equ LOAD_ADDR, 0x402F0400
 
 .equ STACK_SIZE, 256
-.equ STACK_SUPERVISOR_START, 0x402FFF00
+.equ STACK_SUPERVISOR_START, 0x402FFFF0
 
 .equ CM_PER_GPIO1_CLKCTRL, 0x44e000AC
 .equ GPIO1_OE, 0x4804C134
@@ -211,7 +211,6 @@ END:
 
 @see TRM 6.2.2
 IRQ_HDLR:
-
 	@save regs and link
 	stmfd sp!, {r0-r11, lr}
 
@@ -230,24 +229,18 @@ IRQ_HDLR:
   and r10, r10, #0x7F
   cmp r10, #75
   bne INT_XIT	@If some other interrupt, exit. (should never be the case, but still..)
-  
-	@set the interrupt mask bit for the RTC interrupt - i.e, the 11th bit in MIR2, bits0-63 are in MIR0-1 -- TRM 6.3 & 6.5.1.31
+
+  	@set the interrupt mask bit for the RTC interrupt - i.e, the 11th bit in MIR2, bits0-63 are in MIR0-1 -- TRM 6.3 & 6.5.1.31
 	@i.e, disable RTC interrupts till you process current interrupt
     ldr r0, =INTC_MIR2_SET
     ldr r1, [r0]
     orr r1, r1, #(0x01<<11)
     str r1, [r0]
-  
+
 	@toggle the usr0 LED
 	bl PROC_LEDTOGGLE
   
  INT_XIT:
-	@re-enable RTC interrupts
-    ldr r0, =INTC_MIR2_CLEAR
-    ldr r1, [r0]
-    orr r1, r1, #(0x01<<11)
-    str r1, [r0]
-    
   @allow pending/new IRQ's to occur, i.e re-enable ARM interrupts
   ldr r0, =INTC_CTRL
   mov r1, #1
@@ -256,7 +249,13 @@ IRQ_HDLR:
 	@restore regs and link
 	ldmfd sp!, {r0-r11, lr}
 
-  @return from interrupt -- see Cortex A8 TRM from ARM, section 2.15.1
+	@re-enable RTC interrupts
+    ldr r0, =INTC_MIR2_CLEAR
+    ldr r1, [r0]
+    orr r1, r1, #(0x01<<11)
+    str r1, [r0]
+
+	@return from interrupt -- see Cortex A8 TRM from ARM, section 2.15.1
   subs pc, lr, #4
 
 
@@ -280,6 +279,7 @@ LEDOP:
 	mov r1, #(1<<21)
 	str r1, [r0]
 	mov pc, lr
+
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 @currently unused    
