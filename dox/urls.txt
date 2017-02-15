@@ -1,3 +1,5 @@
+https://www.invincealabs.com/blog/2016/08/BBB-part-2/
+https://www.invincealabs.com/blog/2016/05/BBB-part-1/
 http://wiki.minix3.org/en/DevelopersGuide/MinixOnARM
 http://elinux.org/Beagleboard:BeagleBoneBlack
 https://github.com/auselen/down-to-the-bone/tree/master/baremetal_led
