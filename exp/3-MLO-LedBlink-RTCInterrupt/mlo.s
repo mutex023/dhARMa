@@ -60,9 +60,9 @@ _start:
     orr r0, r0, #0xC0	@ disable FIQ and IRQ
     msr cpsr, r0    
     
-    /*
-    NOTE: Stack setup is required, only if you are going to use a stack in your irq processing
-    otherwise there is no need to setup stacks
+    
+    @NOTE: Stack setup is required, only if you are going to use a stack in your irq processing
+    @otherwise there is no need to setup stacks
     
     @Setup supervisor mode stack 
     ldr sp, =STACK_SUPERVISOR_START
@@ -70,8 +70,8 @@ _start:
     
     @switch to undefined exception mode and setup undefined exception stack
     mrs r1, cpsr
-    bic r0, r0, #0x1B	    
-    orr r1, r1, #0x12
+    bic r0, r0, #0x1F
+    orr r1, r1, #0x1B
     msr cpsr, r1
     sub r0, r0, #STACK_SIZE
     mov sp, r0    
@@ -89,7 +89,7 @@ _start:
     bic r0, r0, #0x1F	
     orr r1, r1, #0x13
     msr cpsr, r1
-    */
+    
     
     /* set clock for GPIO1, TRM 8.1.12.1.31 */
     ldr r0, =CM_PER_GPIO1_CLKCTRL
@@ -272,9 +272,6 @@ PROC_LEDON:
     mov r6, #1
     mov r6, r6, lsl r7
     ldr r0, =GPIO1_SETDATAOUT
-    @ldr r5, [r0]
-    @orr r5, r5, r6
-    @str r5, [r0] 
     str r6, [r0]
     mov pc, lr
 
