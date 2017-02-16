@@ -10,6 +10,7 @@ has been referred/used here.
 
 .equ STACK_SIZE, 256
 .equ STACK_SUPERVISOR_START, 0x402FFFF0
+.equ IRQ_STACK_ADDR, 0x402FFDF0
 
 .equ CM_PER_GPIO1_CLKCTRL, 0x44e000AC
 .equ GPIO1_OE, 0x4804C134
@@ -211,6 +212,15 @@ END:
 
 @see TRM 6.2.2
 IRQ_HDLR:
+	mov r0, sp
+	ldr r1, =IRQ_STACK_ADDR
+	cmp r0, r1
+	beq STKGOOD
+	@turn on usr2 led to indicate bad SP !!
+	ldr r0, =GPIO1_SETDATAOUT
+	mov r1, #(1<<23)
+	str r1, [r0]
+STKGOOD:
 	@save regs and link
 	stmfd sp!, {r0-r11, lr}
 

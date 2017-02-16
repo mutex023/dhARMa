@@ -1,0 +1,113 @@
+
+mlo:     file format elf32-littlearm
+
+
+Disassembly of section .text:
+
+402f0400 <_start>:
+402f0400:	e10f0000 	mrs	r0, CPSR
+402f0404:	e3c0001f 	bic	r0, r0, #31
+402f0408:	e3800013 	orr	r0, r0, #19
+402f040c:	e38000c0 	orr	r0, r0, #192	; 0xc0
+402f0410:	e129f000 	msr	CPSR_fc, r0
+402f0414:	e59f0098 	ldr	r0, [pc, #152]	; 402f04b4 <ZLOOP+0x14>
+402f0418:	e3a01002 	mov	r1, #2
+402f041c:	e5801000 	str	r1, [r0]
+402f0420:	e59f0090 	ldr	r0, [pc, #144]	; 402f04b8 <ZLOOP+0x18>
+402f0424:	e3a0161e 	mov	r1, #31457280	; 0x1e00000
+402f0428:	e5801000 	str	r1, [r0]
+402f042c:	e59f0088 	ldr	r0, [pc, #136]	; 402f04bc <ZLOOP+0x1c>
+402f0430:	e5901000 	ldr	r1, [r0]
+402f0434:	e3c1161e 	bic	r1, r1, #31457280	; 0x1e00000
+402f0438:	e5801000 	str	r1, [r0]
+402f043c:	e59f007c 	ldr	r0, [pc, #124]	; 402f04c0 <ZLOOP+0x20>
+402f0440:	e3a01602 	mov	r1, #2097152	; 0x200000
+402f0444:	e5801000 	str	r1, [r0]
+402f0448:	e59fd074 	ldr	r13, [pc, #116]	; 402f04c4 <ZLOOP+0x24>
+402f044c:	e1a0300d 	mov	r3, r13
+402f0450:	e10f1000 	mrs	r1, CPSR
+402f0454:	e3c1101f 	bic	r1, r1, #31
+402f0458:	e381101b 	orr	r1, r1, #27
+402f045c:	e129f001 	msr	CPSR_fc, r1
+402f0460:	e2433c01 	sub	r3, r3, #256	; 0x100
+402f0464:	e1a0d003 	mov	r13, r3
+402f0468:	e10f1000 	mrs	r1, CPSR
+402f046c:	e3c1101f 	bic	r1, r1, #31
+402f0470:	e3811012 	orr	r1, r1, #18
+402f0474:	e129f001 	msr	CPSR_fc, r1
+402f0478:	e2433c01 	sub	r3, r3, #256	; 0x100
+402f047c:	e1a0d003 	mov	r13, r3
+402f0480:	e10f1000 	mrs	r1, CPSR
+402f0484:	e3c1101f 	bic	r1, r1, #31
+402f0488:	e3811013 	orr	r1, r1, #19
+402f048c:	e129f001 	msr	CPSR_fc, r1
+402f0490:	e59f0030 	ldr	r0, [pc, #48]	; 402f04c8 <ZLOOP+0x28>
+402f0494:	e59f1030 	ldr	r1, [pc, #48]	; 402f04cc <ZLOOP+0x2c>
+402f0498:	e0811000 	add	r1, r1, r0
+402f049c:	e3a02000 	mov	r2, #0
+
+402f04a0 <ZLOOP>:
+402f04a0:	e5802000 	str	r2, [r0]
+402f04a4:	e2800004 	add	r0, r0, #4
+402f04a8:	e1500001 	cmp	r0, r1
+402f04ac:	bafffffb 	blt	402f04a0 <ZLOOP>
+402f04b0:	ea000006 	b	402f04d0 <main>
+402f04b4:	44e000ac 	strbtmi	r0, [r0], #172	; 0xac
+402f04b8:	4804c190 	stmdami	r4, {r4, r7, r8, r14, r15}
+402f04bc:	4804c134 	stmdami	r4, {r2, r4, r5, r8, r14, r15}
+402f04c0:	4804c194 	stmdami	r4, {r2, r4, r7, r8, r14, r15}
+402f04c4:	4030cdfc 	ldrshtmi	r12, [r0], -r12
+402f04c8:	402f0500 	eormi	r0, r15, r0, lsl #10
+402f04cc:	00000000 	andeq	r0, r0, r0
+
+402f04d0 <main>:
+402f04d0:	e59f3020 	ldr	r3, [pc, #32]	; 402f04f8 <main+0x28>
+402f04d4:	e59f0020 	ldr	r0, [pc, #32]	; 402f04fc <main+0x2c>
+402f04d8:	e3a0261e 	mov	r2, #31457280	; 0x1e00000
+402f04dc:	e3a0c002 	mov	r12, #2
+402f04e0:	e3a01501 	mov	r1, #4194304	; 0x400000
+402f04e4:	e580c0ac 	str	r12, [r0, #172]	; 0xac
+402f04e8:	e5832190 	str	r2, [r3, #400]	; 0x190
+402f04ec:	e5832134 	str	r2, [r3, #308]	; 0x134
+402f04f0:	e5831194 	str	r1, [r3, #404]	; 0x194
+402f04f4:	eafffffe 	b	402f04f4 <main+0x24>
+402f04f8:	4804c000 	stmdami	r4, {r14, r15}
+402f04fc:	44e00000 	strbtmi	r0, [r0], #0
+
+Disassembly of section .ARM.attributes:
+
+00000000 <.ARM.attributes>:
+   0:	00002b41 	andeq	r2, r0, r1, asr #22
+   4:	61656100 	cmnvs	r5, r0, lsl #2
+   8:	01006962 	tsteq	r0, r2, ror #18
+   c:	00000021 	andeq	r0, r0, r1, lsr #32
+  10:	4d524105 	ldfmie	f4, [r2, #-20]	; 0xffffffec
+  14:	4d445437 	cfstrdmi	mvd5, [r4, #-220]	; 0xffffff24
+  18:	02060049 	andeq	r0, r6, #73	; 0x49
+  1c:	01090108 	tsteq	r9, r8, lsl #2
+  20:	01140412 	tsteq	r4, r2, lsl r4
+  24:	03170115 	tsteq	r7, #1073741829	; 0x40000005
+  28:	011a0118 	tsteq	r10, r8, lsl r1
+
+Disassembly of section .comment:
+
+00000000 <.comment>:
+   0:	3a434347 	bcc	10d0d24 <STACK_SIZE+0x10d0c24>
+   4:	6f532820 	svcvs	0x00532820
+   8:	65637275 	strbvs	r7, [r3, #-629]!	; 0xfffffd8b
+   c:	43207972 	teqmi	r0, #1867776	; 0x1c8000
+  10:	4265646f 	rsbmi	r6, r5, #1862270976	; 0x6f000000
+  14:	68636e65 	stmdavs	r3!, {r0, r2, r5, r6, r9, r10, r11, r13, r14}^
+  18:	74694c20 	strbtvc	r4, [r9], #-3104	; 0xfffff3e0
+  1c:	30322065 	eorscc	r2, r2, r5, rrx
+  20:	302e3431 	eorcc	r3, r14, r1, lsr r4
+  24:	38322d35 	ldmdacc	r2!, {r0, r2, r4, r5, r8, r10, r11, r13}
+  28:	2e342029 	cdpcs	0, 3, cr2, cr4, cr9, {1}
+  2c:	20332e38 	eorscs	r2, r3, r8, lsr r14
+  30:	34313032 	ldrtcc	r3, [r1], #-50	; 0xffffffce
+  34:	30323330 	eorscc	r3, r2, r0, lsr r3
+  38:	72702820 	rsbsvc	r2, r0, #32, 16	; 0x200000
+  3c:	6c657265 	sfmvs	f7, 2, [r5], #-404	; 0xfffffe6c
+  40:	65736165 	ldrbvs	r6, [r3, #-357]!	; 0xfffffe9b
+  44:	Address 0x00000044 is out of bounds.
+
