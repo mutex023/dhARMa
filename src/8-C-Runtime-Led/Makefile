@@ -10,4 +10,4 @@ all :
 	$(CROSS)objcopy mlo mlo.bin -O binary
 
 clean :
-	@/bin/rm *.o *.obj *.bin *.su mlo
+	@/bin/rm *.o *.obj *.bin *.su mlo MLO *.out
