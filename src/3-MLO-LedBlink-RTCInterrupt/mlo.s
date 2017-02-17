@@ -3,6 +3,7 @@ Bare metal BeagleBone Black example for blinking led USR0
 every second using the RTC 1-second interrupt
 Some code from - https://github.com/auselen/down-to-the-bone/tree/master/baremetal_irq
 has been referred/used here.
+@author: muteX023
 */
 
 .equ LOAD_ADDR, 0x402f0400

@@ -1,6 +1,7 @@
 /*
 Bare metal BeagleBone Black example for turning on led USR0.
 Code taken from https://github.com/auselen/down-to-the-bone/tree/master/baremetal_led
+@author: muteX023
 */
 
 .equ CM_PER_GPIO1_CLKCTRL, 0x44e000AC
@@ -28,6 +29,7 @@ _start:
     str r1, [r0]
 
     /* set pin 21 for output, led USR0, TRM 25.3.4.3 */
+    /* don't touch other bits, as they're used for sd card IO !! */
     ldr r0, =GPIO1_OE
     ldr r1, [r0]
     bic r1, r1, #(1<<21)

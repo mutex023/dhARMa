@@ -1,3 +1,6 @@
+@bare-metal startup asm code to setup stack and bss and branch to C code.
+@author: muteX023
+
 .equ STACK_SIZE, 256
 .equ STACK_SUPERVISOR_START, 0x4030CDFC
 

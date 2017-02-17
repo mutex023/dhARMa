@@ -1,5 +1,6 @@
 /*
 Bare metal BeagleBone Black example for turning on usr led's in a grand prix/F1 traffic light fashion.
+@author: muteX023
 */
 
 .equ CM_PER_GPIO1_CLKCTRL, 0x44e000AC

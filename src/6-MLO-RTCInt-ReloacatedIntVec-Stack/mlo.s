@@ -4,6 +4,7 @@
 	This version sets up an interrupt stack and branches to a toggle led subroutine from the main irq handler
 	Some code from - https://github.com/auselen/down-to-the-bone/tree/master/baremetal_irq
 	has been referred/used here.
+	@author: muteX023
 */
 
 .include "../common/bbbAm335xAddr.s"

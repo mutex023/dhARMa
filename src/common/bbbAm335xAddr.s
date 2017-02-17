@@ -1,5 +1,6 @@
 /*
 Commonly used memory mapped addresses of different periperals/registers on the beagle bone black (TI Am335x)
+@author: muteX023
 */
 
 .equ LOAD_ADDR, 0x402f0400

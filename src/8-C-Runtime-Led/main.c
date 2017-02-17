@@ -1,6 +1,7 @@
 /* Simple C program which will turn on usr3 LED on BBB
 * Assumed to be run as an MLO bootloader from SDcard
 * in a bare metal environment
+* @author: muteX023
 */
 
 #include "../common/bbb_hal.h"
@@ -14,7 +15,10 @@ void main()
 
     /* set pin 21,22,23,24 for output, led USR0,1,2,3, TRM 25.3.4.3 */
 	val = READREG32(GPIO1_OE);
-	val &= ~(0xF << 21); //clear the bits 21-24 to enable GPIO1 for output
+	/* clear the bits 21-24 to enable GPIO1 for output
+	* don't touch other bits, as they're used for sd card IO !!
+	*/
+	val &= ~(0xF << 21);
 	WRITEREG32(GPIO1_OE, val);
 
 	/* clear out gpio1-21,22,23,24 pins using data out register first*/

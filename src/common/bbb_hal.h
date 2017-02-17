@@ -1,9 +1,10 @@
-#ifndef __BBB_HAL_H__
-#define __BBB_HAL_H__
-
 /*
 * Commonly used memory mapped addresses of different periperals/registers on the beagle bone black (TI Am335x)
+* @author: muteX023
 */
+
+#ifndef __BBB_HAL_H__
+#define __BBB_HAL_H__
 
 #define LOAD_ADDR 0x402f0400
 

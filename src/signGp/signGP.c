@@ -1,4 +1,8 @@
-/*Code taken from: https://beagleboard.googlecode.com/files/signGP.c*/
+/*
+* signGP - https://beagleboard.googlecode.com/files/signGP.c
+* Modified for BeagleBoneBlack by,
+* @author: muteX023
+*/
 
 //
 // signGP.c
@@ -36,7 +40,8 @@ main(int argc, char *argv[])
 
 	// Default to x-load.bin and 0x40200800.
 	strcpy(ifname, "x-load.bin");
-	loadaddr = 0x402f0400;//0x40200800;
+	//loadaddr = 0x40200800;
+	loadaddr = 0x402f0400; // BBB internal SRAM start addr
 
 	if ((argc == 2) || (argc == 3))
 		strcpy(ifname, argv[1]);
