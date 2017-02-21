@@ -1,7 +1,7 @@
 /* Bare metal C program to initialize the onboard 512MB MIcron DDR3 RAM
 * on BBB. The usr0 led will be turned on if init is successful.
 * The code to init the RAM is taken from TI Starterware code
-* (~/bootloader/src/armv7a/am335x/bl_platform.c - DDR3PhyInit() & DDR3Init() )
+* (~/bootloader/src/armv7a/am335x/bl_platform.c - DDRPLLInit(), EMIFInit(), DDR3PhyInit() & DDR3Init() )
 * Initializing RAM involves setting different values to different registers
 * and involves complex terminology like Phase Locked Loops (PLL),
 * ODT (On die Termination), slave ratios, CAS/RAS (column/row addr strobe) etc..,
@@ -14,9 +14,41 @@
 
 #include "../common/bbb_hal.h"
 
-void	init_ddr_pll()
+void init_ddr_pll()
 {
-
+	unsigned int val = 0;
+	
+	/* put the DPLL in MN bypass mode - no idea what this means - TRM 8.1.12.2.38 */
+	val = READREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_CLKMODE_DPLL_DDR_OFFSET);
+	val &= ~0x7;
+	val |= 0x4;
+	WRITEREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_CLKMODE_DPLL_DDR_OFFSET, val);
+	/* wait till DPLL switches to bypass mode - TRM 8.1.12.2.14	*/
+	while ( !(READREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_IDLEST_DPLL_DDR_OFFSET)
+		& 0x100) );
+	
+	/* clear and set the MULT and DIV factors for the DPLL - TRM 8.1.12.2.17 */
+	val = READREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_CLKSEL_DPLL_DDR_OFFSET);
+	val &= ~0x7FF7F;
+	WRITEREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_CLKSEL_DPLL_DDR_OFFSET, val);
+	val = READREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_CLKSEL_DPLL_DDR_OFFSET);
+	val |= (DDR3_FREQ << 8) | DDRPLL_N;
+	WRITEREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_CLKSEL_DPLL_DDR_OFFSET, val);
+	
+	/* set M2 clkout post divider factor for the DPLL - TRM 8.1.12.2.41 */
+	val = READREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_DIV_M2_DPLL_DDR_OFFSET);
+	val &= ~0x1F;
+	val |= DDRPLL_M2;
+	WRITEREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_DIV_M2_DPLL_DDR_OFFSET, val);
+	
+	/* lock the DPLL - TRM 8.1.12.2.38 */
+	val = READREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_CLKMODE_DPLL_DDR_OFFSET);
+	val &= ~0x7;
+	val |= 0x7;
+	WRITEREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_CLKMODE_DPLL_DDR_OFFSET, val);
+	/* wait for DPLL to be locked - TRM 8.1.12.2.14 */
+	while ( !(READREG32(CM_WKUP_REGS_BASE + CM_WKUP_CM_IDLEST_DPLL_DDR_OFFSET)
+		& 0x1) );
 }
 
 int init_ddr3_ram()
