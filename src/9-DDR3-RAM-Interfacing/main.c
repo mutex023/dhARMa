@@ -51,11 +51,39 @@ void init_ddr_pll()
 		& 0x1) );
 }
 
+void init_emif()
+{
+	unsigned int val = 0;
+
+	/* enable EMIF Firewall Clock - TRM 8.1.12.1.38 */
+	val = READREG32(CM_PER_REGS_BASE + CM_PER_EMIF_FW_CLKCTRL_OFFSET);
+	val &= ~0x3;
+	val |= 0x2;
+	WRITEREG32(CM_PER_REGS_BASE + CM_PER_EMIF_FW_CLKCTRL_OFFSET, val);
+
+	/* enable EMIF clock - TRM 8.1.12.1.9 */
+	val = READREG32(CM_PER_REGS_BASE + CM_PER_EMIF_CLKCTRL_OFFSET);
+	val &= ~0x3;
+	val |= 0x2;
+	WRITEREG32(CM_PER_REGS_BASE + CM_PER_EMIF_CLKCTRL_OFFSET, val);
+	
+	/* wait for the clocks EMIF_GCLK & L3_GCLK to go active - TRM 8.1.12.1.4 */
+	while (READREG32(CM_PER_REGS_BASE + CM_PER_L3_CLKSTCTRL_OFFSET) & 0x14 != 0x14)
+		;
+}
+
 int init_ddr3_ram()
 {
 	unsigned int val = 0;
 	
+	/* initialize the DDR3 PLL */
 	init_ddr_pll();
+	
+	/* enable the CM_WKUP clock control module - TRM 8.1.12.2.2 */
+	WRITEREG32(CM_WKUP_REGS_BASE + CM_WKUP_CONTROL_CLKCTRL_OFFSET, 0x2);
+	
+	/* initialize the External mem interface EMIF */
+	init_emif();
 	
 	/* enable VTP (Voltage, Temp, Process) control, TRM - 9.3.54 */
 	val = READREG32(CTRL_MODULE_REG_BASE + CTRL_MODULE_VTP_CTRL_OFFSET);
