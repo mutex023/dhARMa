@@ -1,6 +1,6 @@
 9-DDR3-RAM-interfacing
 ===============================
-Time to use the RAM the BBB !
+Time to RAM the BBB !
 We build on top of prog 8 and initialize the DDR3 RAM on BBB.
 Then we perform a simple test of writing to the RAM and reading back to check if
 the RAM is functioning properly.
