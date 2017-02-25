@@ -1,0 +1,8 @@
+bbb_hal.c:8:6:hal_init_led	16	static
+bbb_hal.c:27:6:hal_usr_led_on	24	static
+bbb_hal.c:35:6:hal_usr_led_off	24	static
+bbb_hal.c:43:6:hal_init_ddr_pll	16	static
+bbb_hal.c:80:6:hal_init_emif	16	static
+bbb_hal.c:101:6:hal_init_ddr_phy	16	static
+bbb_hal.c:161:6:hal_init_ddr3_ram	16	static
+bbb_hal.c:221:4:hal_ram_test	40	static

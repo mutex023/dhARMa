@@ -1,11 +1,23 @@
 /*
-* Commonly used memory mapped addresses of different periperals/registers on the beagle bone black (TI Am335x)
+* HW abstraction layer header for BeagleBoneBlack. Contains functions to init hw, operate peripherals and regs, and
+* commonly used memory mapped addresses of different periperals/registers on the beagle bone black (TI Am335x)
 * @author: muteX023
 */
 
 #ifndef __BBB_HAL_H__
 #define __BBB_HAL_H__
 
+#include "types.h"
+
+/* prototypes API*/
+void hal_init_led();
+void hal_usr_led_on(u8 led_num);
+void hal_usr_led_off(u8 led_num);
+void hal_init_ddr3_ram();
+u8 hal_ram_test(u32 val, u64 size);
+
+
+/* addresses - refer TRM of AM335x */
 #define LOAD_ADDR 0x402f0400
 
 #define CM_PER_GPIO1_CLKCTRL 0x44e000AC
