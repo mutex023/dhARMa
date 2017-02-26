@@ -6,8 +6,6 @@
 
 #include "../common/bbb_hal.h"
 
-u32 hola;
-
 void init()
 {
 	hal_init_led();
@@ -27,18 +25,7 @@ void init()
 
 void main()
 {
-	static u32 jumba;
-	hal_usr_led_on(3);
 
-	/* test BSS - using the uninitalized static and global vars 
-	* the startup C should take care of initializing global and static
-	* uninitialized variables to zero - which is actually done by
-	* just zeroing out the bss segment in the asm code 
-	*/
-	jumba += 3;
-	hola += 3;
-	if (jumba + hola == 6)
-		hal_usr_led_off(0);
 
 	while(1);
 }

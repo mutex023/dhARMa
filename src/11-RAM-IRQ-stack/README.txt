@@ -1,10 +1,9 @@
-10-RAM-stack
+11-RAM-STACK-IRQ
 ===============================
-Extension of prog 9.
-We now place the stack on the RAM and execute function calls on the RAM.
-For this we first place the stack on internal L3 RAM, branch to the C code which initializes DDR3 RAM,
-then return from the C code back to asm, where we switch the stack to the RAM address and then branch
-back to C code.
+Now shift the interrupt handlers also to the RAM along with the stack as per the following
+memory map:
+	0xA000000 --->     
+Blink the usr0 led using RTC 1 second interrupt.
 
 To build: 
 1) Make sure you have built the signgp utility first.
@@ -23,9 +22,5 @@ This file has to be put onto an sd-card in raw format as described in the TI AM3
 6) While holding the boot (S2) button remove power cable/USB cable and re-insert power while continuing to hold down S2.
 
 Output:
-1. usr0 led = 1; indicates branch to C-code init function from startup asm successful
-2. usr1 led = 1; after a delay of around 5 sec, indicates RAM init and test successful
-3. usr2 led = 1; jump back to asm startup code from C successful
-4. usr3 led = 1; relocation of stack to RAM and branch back to C main function successful
-5. usr1 led = 0; BSS segment functional
+1. usr0 led toggles every second.
 
