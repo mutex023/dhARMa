@@ -235,8 +235,7 @@ IRQ_HDLR:
 	@set the interrupt mask bit for the RTC interrupt - i.e, the 11th bit in MIR2, bits0-63 are in MIR0-1 -- TRM 6.3 & 6.5.1.31
 	@i.e, disable RTC interrupts till you process current interrupt
     ldr r0, =INTC_MIR2_SET
-    ldr r1, [r0]
-    orr r1, r1, #(0x01<<11)
+    mov r1, #(0x01<<11)
     str r1, [r0]
   
 	@toggle the usr0 LED
@@ -257,8 +256,7 @@ IRQ_HDLR:
 	@between 0x402F0400 - 0x402FFFFF. Also keep in mind that in bare metal mode the public ROM would have set
 	@processor clock speed to only 500mhz instead of 1ghz, so the irq handler may take more than a second to exec.
     ldr r0, =INTC_MIR2_CLEAR
-    ldr r1, [r0]
-    orr r1, r1, #(0x01<<11)
+    mov r1, #(0x01<<11)
     str r1, [r0]
 
   @return from interrupt -- see Cortex A8 TRM from ARM, section 2.15.1

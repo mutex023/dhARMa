@@ -28,6 +28,7 @@ has been referred/used here.
 .equ INTC_ISR_CLEAR0, 0x48200094
 .equ INTC_MIR2, 0x482000C4
 .equ INTC_MIR2_CLEAR, 0x482000C8
+.equ INTC_MIR2_SET, 0x482000CC
 .equ INTC_MIR0_CLEAR, 0x48200088
 .equ INTC_ILR75, 0X4820022C	@4h offset for each register 100h - 2fch 
 .equ INTC_SIR_IRQ, 0X48200040
@@ -60,39 +61,8 @@ _start:
     bic r0, r0, #0x1F	@ clear mode bits
     orr r0, r0, #0x13	@ set supervisor mode
     orr r0, r0, #0xC0	@ disable FIQ and IRQ
-    msr cpsr, r0    
-    
-    /*
-    NOTE: Stack setup is required, only if you are going to use a stack in your irq processing
-    otherwise there is no need to setup stacks
-    
-    @Setup supervisor mode stack 
-    ldr sp, =STACK_SUPERVISOR_START
-    mov r0, sp
-    
-    @switch to undefined exception mode and setup undefined exception stack
-    mrs r1, cpsr
-	bic r0, r0, #0x1B	    
-    orr r1, r1, #0x12
-    msr cpsr, r1
-    sub r0, r0, #STACK_SIZE
-    mov sp, r0    
+    msr cpsr, r0
 
-    @switch to irq mode and setup irq stack -- ARM sys dev guide -- 9.2.4
-    mrs r1, cpsr
-	bic r0, r0, #0x1F	    
-    orr r1, r1, #0x12
-    msr cpsr, r1
-    sub r0, r0, #STACK_SIZE
-    mov sp, r0   
-	
-	@back to supervisor mode
-	mrs r1, cpsr
-	bic r0, r0, #0x1F	
-    orr r1, r1, #0x13
-    msr cpsr, r1
-    */
-    
     /* set clock for GPIO1, TRM 8.1.12.1.31 */
     ldr r0, =CM_PER_GPIO1_CLKCTRL
     ldr r1, =0x02
@@ -125,7 +95,7 @@ _start:
     str r1, [r0]  
     
     /*
-    Need to move the interrupt vector to a custom address at the end of OCMC RAM
+    * Need to move the interrupt vector to a custom address at the end of L3 RAM
     */
     @Calculate the absolute address of the vector table and move the instructions one by one
     ldr r0, =INTVEC_TABLE
@@ -140,8 +110,7 @@ _start:
     ldr r5, =NO_HDLR
     add r5, r1
     str r5, [r0, #36]
-    
-    
+
     @copy the intvec table, irq handler address and NO_HDLR address to the custom address    
     mov r3, #10
 COPY_LOOP:
@@ -152,30 +121,36 @@ COPY_LOOP:
 	subs r3, #1
 	bne COPY_LOOP        
     
-    @set usr2 led on to indicate copy finished successfully
-    mov r7, #2
+    @set usr1 led on to indicate copy finished successfully
+    mov r7, #1
     bl PROC_LEDON
 
-SKIP:
     /*
     NOTE: Setting VBAR is required if you decide to relocate your vector table to an address
     other than the one provided by the initial boot code.
+    @Note - even though the Am335x TRM itself says (6.2.2) that ARM blindly branches to 0x00000018 for IRQ
+    @in reality for cortex processors, ARM will branch to VBAR+18h if VBAR is configured (which is done by the TI ROM boot code)
+    @this is found in Cortex A series programming guide -- 3.1.4 and online in the ARM documentation
+    @see - http:@infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0433b/CIHHDAIH.html
     ex:- TI startware relocates it to 0x4030FC00
+    We are relocating it to 0x4030FD00 -- nearly towards the end of the L3 RAM
     */  
-    @Set the interrupt vector base address via the sysctrl register -- CortexA series prog guide 3.1.4
+    @Set the interrupt vector base address via the co-processor (CP15) sysctrl register (c1) -- CortexA series prog guide 3.1.4
     mrc p15, #0, r0, c1, c0, #0    @ Read CP15 SCTRL Register
-    bic r0, #(1 << 13)     		 @ V = 0 -- set this bit to zero to relocate interrupt table
+    @ V = 0 -- set the 'V' bit to zero to relocate interrupt table (disable high vectors)
+    bic r0, #(1 << 13)
 	mcr p15, #0, r0, c1, c0, #0    @ Write CP15 SCTRL Register
 	ldr r0, =INTVEC_TABLE_BASE
-    mcr p15, #0, r0, c12, c0, #0   @ Set VBAR -- note that the last 5 bits of the address MUST be zero -- sec B4.1.156 in ARMv7-A-R Arch. Ref. Manual
+	@ Set VBAR -- note that the last 5 bits of the address MUST be zero -- sec B4.1.156 in ARMv7-A-R Arch. Ref. Manual
+    mcr p15, #0, r0, c12, c0, #0
     
     @Just verify if the VBAR is set correctly
     mrc p15, #0, r3, c12, c0, #0
     cmp r0, r3
     bne NEXT
     
-    @set usr1 led on
-    mov r7, #1
+    @set usr2 led on
+    mov r7, #2
     bl PROC_LEDON
     
 NEXT:    
@@ -205,11 +180,6 @@ NEXT:
     mov r1, #(1<<6)
     str r1, [r0]
 
-       
-    ldr r8, =GPIO1_DATAOUT
-    mov r9, #(1<<21)
-	
-        
     @must wait for RTC BUSY period to end before enabling RTC timer interrupt -- TRM 20.3.5.15/16
 WAIT_BUSY:
     ldr r0, =RTC_STATUS_REG
@@ -222,19 +192,6 @@ WAIT_BUSY:
     mov r1, #0x04
     str r1, [r0]  
     
-    /*
-    @install the custom interrupt handler at the specified internal RAM addr -- TRM 26.1.3.2
-    @Note - even though the Am335x TRM itself says (6.2.2) that ARM blindly branches to 0x00000018 for IRQ
-    @in reality for cortex processors, ARM will branch to VBAR+18h if VBAR is configured (which is done by the TI ROM boot code)
-    @this is found in Cortex A series programming guide -- 3.1.4 and online in the ARM documentation
-    @see - http:@infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0433b/CIHHDAIH.html
-    ldr r0, =INT_IRQ_HDLR_RAM
-    ldr r1, =IRQ_HDLR
-    ldr r2, =LOAD_ADDR	@need to add the load address, because the assembler will only generate a relative address
-    add r1, r2
-    str r1, [r0]      
-    */
-        
     @finally enable interrupts on ARM side
     mrs r0, cpsr
     bic r0, r0, #0x80	@ disable FIQ, but enable IRQ
@@ -244,24 +201,18 @@ WAIT_BUSY:
     ldr r0, =INTC_MIR2_CLEAR
     mov r1, #(0x01<<11)
     str r1, [r0]
-
    
+    mov r8, #(1<<21)
 END:
     nop
     b END
-    
+
 
 /*
 The IRQ handler -- see TRM 6.2.2 for more details on how to implement an IRQ/interrupt handler
 */
-IRQ_HDLR:	
-  @save return address
-  mov r4, lr  
-  
-  @save ctx -- currently not used
-  @stmfd sp!, {r0-r12, lr}
-  @mrs r11, spsr
-  
+IRQ_HDLR:
+
   @ignore spurious interrupts
   ldr r5, =INTC_SIR_IRQ
   ldr r6, [r5]
@@ -277,17 +228,23 @@ IRQ_HDLR:
   and r5, r5, #0x7F 
   cmp r5, #75
   bne INT_XIT	@If some other interrupt, exit. (should never be the case, but still..)
-  
-  @ideally we must disable RTC interrupts here before processing
-  @but since the speed of the cortex processor is quite high
-  @the handler would certainly have finished exec. before the next
-  @1-sec interrupt, so we don't bother
-  
-  @toggle the usr0 LED
-  ldr r0, =GPIO1_DATAOUT
-  ldr r1, [r0]
-  eor r1, r1, #(1<<21)
-  str r1, [r0]
+
+	@set the interrupt mask bit for the RTC interrupt - i.e, the 11th bit in MIR2, bits0-63 are in MIR0-1 -- TRM 6.3 & 6.5.1.31
+	@i.e, disable RTC interrupts till you process current interrupt
+    ldr r0, =INTC_MIR2_SET
+    mov r1, #(0x01<<11)
+    str r1, [r0]
+
+	@toggle the usr0 LED
+	ldr r0, =GPIO1_SETDATAOUT
+	ldr r1, [r0]
+	tst r1, #(1<<21)
+	beq LEDOP
+	ldr r0, =GPIO1_CLEARDATAOUT
+LEDOP:
+	mov r1, #(1<<21)
+	str r1, [r0]
+	@lsl r8, #1
   
 INT_XIT:
   @allow pending/new IRQ's to occur
@@ -295,17 +252,16 @@ INT_XIT:
   mov r1, #1
   str r1, [r0]
 
-  @data sync barrier -- dunno what this is, need to research
-  mcr p15, #0, r0, c7, c10, #4
+	@re-enable RTC interrupts - we should do this after the memory (stack) access on the off chance
+	@that memory is slower resulting in another interrupt before current one is handled.
+	@this scenario is observed if for example we change the stack location to the slower internal SRAM address
+	@between 0x402F0400 - 0x402FFFFF. Also keep in mind that in bare metal mode the public ROM would have set
+	@processor clock speed to only 500mhz instead of 1ghz, so the irq handler may take more than a second to exec.
+    ldr r0, =INTC_MIR2_CLEAR
+    mov r1, #(0x01<<11)
+    str r1, [r0]
 
-  @restore ctx
-  @msr spsr, r11
-  @ldmfd sp!, {r0-r12, lr}
-  
-  @restore return address
-  mov lr, r4
-  
-  @return from interrupt
+  @return from interrupt -- see Cortex A8 TRM from ARM, section 2.15.1
   subs pc, lr, #4
 
 
@@ -314,10 +270,8 @@ PROC_LEDON:
     add r7, r7, #21
     mov r6, #1
     mov r6, r6, lsl r7
-    ldr r0, =GPIO1_DATAOUT
-    ldr r5, [r0]
-    orr r5, r5, r6
-    str r5, [r0] 
+    ldr r0, =GPIO1_SETDATAOUT
+    str r6, [r0] 
     mov pc, lr
 
 /*
