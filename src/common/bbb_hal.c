@@ -24,6 +24,19 @@ void hal_init_led()
 	WRITEREG32(GPIO1_CLEARDATAOUT, 0x0F<<21);
 }
 
+void hal_usr_led_toggle(u8 led_num)
+{
+	u32 val = 0;
+	u32 led = 0;
+
+	led = 0x1 << (led_num + 21);
+	val = READREG32(GPIO1_SETDATAOUT);
+	if (val & led)
+		WRITEREG32(GPIO1_CLEARDATAOUT, led);
+	else
+		WRITEREG32(GPIO1_SETDATAOUT, led);
+}
+
 void hal_usr_led_on(u8 led_num)
 {
 	u32 val = 0;
@@ -240,3 +253,72 @@ u8 hal_ram_test(u32 val, u64 size)
 	return 1;
 }
 
+void hal_init_intr(u32 intr_num, intr_type_t intr_type, u8 priority)
+{
+    /* set free running interrupt ctrl clock -- TRM 6.5.1.2/8 */
+	WRITEREG32(INTC_SYSCONFING, 0);
+	WRITEREG32(INTC_IDLE, 0x01);
+	
+	/* set priority and type(fiq/irq) for the interrupt -- TRM 6.5.1.44 */
+    WRITEREG32(INTC_ILR_BASE + (intr_num * 4), ((priority << 2) | intr_type));
+}
+
+void hal_init_rtc_intr(rtc_intr_period_t period, rtc_intr_periodicity_t periodicity)
+{
+	/* enable the RTC clock module -- TRM 8.1.12.6 */
+    WRITEREG32(CM_RTC_CLKSCTRL, 0x02);
+    WRITEREG32(CM_RTC_RTC_CLKCTRL, 0x02);
+
+	/* disable RTC register write protection -- TRM 20.3.5.23 */
+    WRITEREG32(RTC_KICK0R, RTC_WRENABLE_KEY1);
+    WRITEREG32(RTC_KICK1R, RTC_WRENABLE_KEY2);
+    
+	/* enable the RTC -- TRM 20.3.5.14 */
+    WRITEREG32(RTC_CTRL_REG, 0x01);
+	
+    /* set RTC to use the more accurate external 32khz oscillator -- TRM 20.3.5.19 */
+    WRITEREG32(RTC_OSC_REG, 1 << 6);
+	
+	/* must wait for RTC BUSY period to end before enabling RTC timer interrupt -- TRM 20.3.5.15/16 */
+	while (!(READREG32(RTC_STATUS_REG) & 0x01))
+		;
+
+	/* enable the RTC interrupt -- TRM 20.3.5.16 */
+    WRITEREG32(RTC_INTERRUPTS_REG, (periodicity << 2) | period);
+
+    /* clear the interrupt mask bit for the RTC interrupt
+	 * i.e, the 11th bit in MIR2, bits0-63 are in MIR0-1
+	 * -- TRM 6.3 & 6.5.1.29
+	*/
+    WRITEREG32(INTC_MIR2_CLEAR, 0x01 << 11);
+}
+
+void hal_delay_1s()
+{
+/* Delay of approx. 1s - some dummy instructions executed in a tight loop
+* ALU instructions take 1 cycle to exec, branch takes 3 cycles -- see Sec 6.3 in ARM system developers guide
+* Extrapolate that to the 1ghz AM3358 processor on BBB for a loop count to get a 1s delay,
+* but in reality the TI boot rom code would have set the proc to run at 500mhz instead of 1ghz 
+*/	asm volatile (
+		"PROC_DELAY: \n"
+		"ldr r8, =4807692 \n"
+		"DELAY_LOOP1: \n"
+		"add r7, r7, r9 \n"
+		"add r7, r7, r9 \n"
+		"add r7, r7, r9 \n"
+		"add r7, r7, r9 \n"
+		"add r7, r7, r9 \n"
+		"add r7, r7, r9 \n"
+		"add r7, r7, r9 \n"
+		"add r7, r7, r9 \n"
+		"sub r8, #1 \n"
+		"cmp r8, #0 \n"
+		"bne DELAY_LOOP1 \n"
+	);
+}
+
+void hal_delay(u32 sec)
+{
+	while(sec--)
+		hal_delay_1s();
+}

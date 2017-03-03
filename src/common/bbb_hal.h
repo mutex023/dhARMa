@@ -9,14 +9,6 @@
 
 #include "types.h"
 
-/* prototypes API*/
-void hal_init_led();
-void hal_usr_led_on(u8 led_num);
-void hal_usr_led_off(u8 led_num);
-void hal_init_ddr3_ram();
-u8 hal_ram_test(u32 val, u64 size);
-
-
 /* addresses - refer TRM of AM335x */
 #define LOAD_ADDR 0x402f0400
 
@@ -36,8 +28,10 @@ u8 hal_ram_test(u32 val, u64 size);
 #define INTC_ISR_SET0 0x48200090
 #define INTC_ISR_CLEAR0 0x48200094
 #define INTC_MIR2 0x482000C4
+#define INTC_MIR2_SET 0x482000CC
 #define INTC_MIR2_CLEAR 0x482000C8
 #define INTC_MIR0_CLEAR 0x48200088
+#define INTC_ILR_BASE 0x48200100
 #define INTC_ILR75 0X4820022C	/* 4h offset for each register 100h - 2fch */
 #define INTC_SIR_IRQ 0X48200040
 #define INTC_IRQ_PRIORITY 0x48200060
@@ -55,6 +49,7 @@ u8 hal_ram_test(u32 val, u64 size);
 #define RTC_KICK1R 0x44E3E070
 #define RTC_WRENABLE_KEY1 0x83E70B13
 #define RTC_WRENABLE_KEY2 0x95A4F1E0
+#define RTC_INTR_NUM 75
 
 #define CM_RTC_RTC_CLKCTRL 0x44E00800
 #define CM_RTC_CLKSCTRL 0x44E00804
@@ -152,5 +147,34 @@ u8 hal_ram_test(u32 val, u64 size);
 /* read and write register macros */
 #define WRITEREG32(addr, val) ( *(volatile unsigned int *)(addr) = (val))
 #define READREG32(addr) ( *(volatile unsigned int *)(addr) )
+
+
+typedef enum {
+	IRQ,
+	FIQ
+} intr_type_t;
+
+typedef enum {
+	RTC_INTR_PERIODIC_DISABLE = 0x0,
+	RTC_INTR_PERIODIC_ENABLE = 0x1
+} rtc_intr_periodicity_t;
+
+typedef enum {
+	EVERY_SEC,
+	EVERY_MIN,
+	EVERY_HOUR,
+	EVERY_DAY
+} rtc_intr_period_t;
+
+/* prototypes API*/
+void hal_init_led();
+void hal_usr_led_on(u8 led_num);
+void hal_usr_led_off(u8 led_num);
+void hal_usr_led_toggle(u8 led_num);
+void hal_init_ddr3_ram();
+u8 hal_ram_test(u32 val, u64 size);
+void hal_init_intr(u32 intr_num, intr_type_t intr_type, u8 priority);
+void hal_init_rtc_intr(rtc_intr_period_t period, rtc_intr_periodicity_t periodicity);
+void hal_delay(u32 sec);
 
 #endif /*__BBB_HAL_H__*/

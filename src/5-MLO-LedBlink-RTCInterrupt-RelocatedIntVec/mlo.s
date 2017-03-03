@@ -190,7 +190,7 @@ WAIT_BUSY:
     @enable the RTC periodic 1 sec interrupt -- TRM 20.3.5.16
     ldr r0, =RTC_INTERRUPTS_REG
     mov r1, #0x04
-    str r1, [r0]  
+    str r1, [r0]
     
     @finally enable interrupts on ARM side
     mrs r0, cpsr

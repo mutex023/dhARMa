@@ -1,46 +1,50 @@
 11-RAM-STACK-IRQ
 ===============================
-Now shift the interrupt table and handlers also to the RAM along with the stack as per the following
-memory map:
+In this program, we shift the interrupt table and handlers also to the RAM along with the stack as per the following
+memory map: (addresses are for illustrative purposes only !)
 
-	0xA0000000  ---> ldr pc, reset_hdlr ;intr_table() - interrupt table start
-	0x9FFFFFFF ---> ldr pc, undef_hdlr
+	0xA0000000 ---> DDR3 RAM end
+	.
+	.
+	0x9FFFFFE0 ---> ldr pc, fiq_hdlr ;intr_table() - end
+	0x9FFFFFDC ---> ldr pc, irq_hdlr
 	.
 	.
 	.
-	0x9FFFFFD2 ---> ldr pc, irq_hdlr
-	0x9FFFFFCE ---> ldr pc, fiq_hdlr ;interrupt table end
-	0x9FFFFFCA ---> reset_hdlr() ; individual handlers (assuming a 0x256 bytes size for each function
-	.								for illustrative purposes only !)
-	.
-	.
-	0x9FFFFD74 ---> undef_hdlr()
-	.
-	.
-	0x9FFFFB1E ---> swi_hdlr()
+	0x9FFFFFD2 ---> ldr pc, undef_hdlr
+	0x9FFFFFC0 ---> ldr pc, reset_hdlr ;intr_table() - start
+	0x9FFFFFBC ---> reset_hdlr() - end
 	.
 	.
 	.
+	0x9FFFFEBC ---> undef_hdlr()
 	.
 	.
-	0x9FFFF1C6 ---> irq_hdlr()
-	.
-	.
-	0x9FFFEF70 ---> fiq_hdlr() - end of fiq_hdlr()
+	0x9FFFFDBC ---> swi_hdlr()
 	.
 	.
 	.
 	.
-	.			---> start of fiq_hdlr()
-	0x9FFFED1A ---> stack starts from here and grows downwards
+	.
+	0x9FFFFCBC ---> irq_hdlr()
+	.
+	.
+	0x9FFFFBBC ---> fiq_hdlr() - end of fiq_hdlr()
+	.
+	.			^
+	.			|
+	.			|   assuming a 256 bytes size for each function
+	.			|   Interrupt handlers code section grow upward
+	0x9FFFFABC ---> start of fiq_hdlr()
+	0x9FFFFAB8 ---> stack starts from here and grows downwards
 	.			|
 	.			|
 	.			|
 	.			|
-	.
-	.
-	.
-	.
+	.			|
+	.			|
+	.			|
+	.			|
 	.			|
 	.			|
 	.			|
@@ -76,6 +80,11 @@ instruction in the table to jump to irq/fiq/reset handlers. But this pc relative
 only if we maintain the same ordering of the code section when copying from L3 RAM to DDR RAM.
 
 Like in prog10, the stack is first on the L3 RAM, and later shifted to DDR3 RAM.
+However we do not shift the BSS. The main problem is if we want to do so, then the linker script
+should put the start addr as 0x80000000, which will result in problems when relocating the 
+interrupt handlers and table, as the generated instructions will us addresses from
+0x80000000 while refering to the function addresses.
+
 In the main() function we will keep toggling the usr1 led in a delay loop.
 Meanwhile the 1-sec RTC interrupt will cause the usr-0 led to also toggle.
 This will ensure that both the relocated intr handlers and the stack on the RAM is continuously
