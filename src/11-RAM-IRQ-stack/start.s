@@ -1,5 +1,5 @@
 @bare-metal startup asm code to setup stack and bss and branch to C code which will
-@init the RAM and return, the asm code resumes and shifts the stack to RAM and jumps
+@init the RAM and return, the asm code resumes and shifts the stack to RAM, enables interrupts and jumps
 @back to the C code 'main' function to resume execution utilising the stack on the RAM
 @
 @author: muteX023
@@ -93,9 +93,10 @@ ZLOOP:
 	msr cpsr, r1
 
 	@enable interrupts on ARM side
-    mrs r0, cpsr
-    bic r0, r0, #0x80	@ disable FIQ, but enable IRQ
-    msr cpsr, r0
+	mrs r0, cpsr
+	bic r0, r0, #0x80	@ disable FIQ, but enable IRQ
+	msr cpsr, r0
 	
 	@ now back to C-code 'main' function
 	b main
+

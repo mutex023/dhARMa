@@ -129,11 +129,10 @@ COPY_LOOP:
     NOTE: Setting VBAR is required if you decide to relocate your vector table to an address
     other than the one provided by the initial boot code.
     @Note - even though the Am335x TRM itself says (6.2.2) that ARM blindly branches to 0x00000018 for IRQ
-    @in reality for cortex processors, ARM will branch to VBAR+18h if VBAR is configured (which is done by the TI ROM boot code)
+    @in reality for cortex processors, ARM will branch to VBAR addr if VBAR is configured (which is done by the TI ROM boot code)
     @this is found in Cortex A series programming guide -- 3.1.4 and online in the ARM documentation
     @see - http:@infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0433b/CIHHDAIH.html
     ex:- TI startware relocates it to 0x4030FC00
-    We are relocating it to 0x4030FD00 -- nearly towards the end of the L3 RAM
     */  
     @Set the interrupt vector base address via the co-processor (CP15) sysctrl register (c1) -- CortexA series prog guide 3.1.4
     mrc p15, #0, r0, c1, c0, #0    @ Read CP15 SCTRL Register
@@ -288,14 +287,16 @@ The addresses of the IRQ handler and the default handler are stored in two 32-bi
 table so that pc relative addressing can be used to execute the jump.
 */
 INTVEC_TABLE:
-		ldr pc, [pc, #28]    	/* reset - _start  		*/
-        ldr pc, [pc, #24]       /* undefined - _undf    */
-        ldr pc, [pc, #20]       /* SWI - _swi           */
-        ldr pc, [pc, #16]     	/* program abort - _pabt*/
-        ldr pc, [pc, #12]     	/* data abort - _dabt   */
-        nop					    /* reserved             */
-		ldr pc, [pc, #0]		/* IRQ - branch to IRQ_HDLR address stored at dummy1  -- PC always points to current instr. + 8 bytes due to historical reasons related to pipelining*/      		
-        ldr pc, [pc, #0]        /* FIQ - _fiq           */    
-     	nop						/* dummy1 - used to store absolute 32-bit addr. of IRQ handler */
-     	nop						/* dummy2 - used to store absolute 32-bit addr. of NO_HDLR     */     	
+	ldr pc, [pc, #28]	/* reset - _start  		*/
+	ldr pc, [pc, #24]	/* undefined - _undf    */
+	ldr pc, [pc, #20]	/* SWI - _swi           */
+	ldr pc, [pc, #16]	/* program abort - _pabt*/
+	ldr pc, [pc, #12]	/* data abort - _dabt   */
+	nop				/* reserved      */
+	ldr pc, [pc, #0]	/* IRQ, branch to IRQ_HDLR address stored at dummy1,
+					* PC always points to current instr. + 8 bytes
+					* due to historical reasons related to pipelining */
+	ldr pc, [pc, #0]	/* FIQ - _fiq  */
+	nop				/* dummy1 - used to store absolute 32-bit addr. of IRQ handler */
+	nop				/* dummy2 - used to store absolute 32-bit addr. of NO_HDLR     */     	
 

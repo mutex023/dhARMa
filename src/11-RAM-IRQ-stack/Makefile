@@ -1,6 +1,6 @@
 CROSS = arm-none-eabi-
 CFLAGS = -Wall -nostdlib -nostartfiles -ffreestanding -fstack-usage -Wstack-usage=256
-#$(CROSS)objdump -M reg-names-raw -D mlo > mlo.obj
+
 all :
 	$(CROSS)as start.s -o start.o
 	$(CROSS)gcc $(CFLAGS) -c main.c -o main.o

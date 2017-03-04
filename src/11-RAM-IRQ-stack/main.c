@@ -11,7 +11,7 @@
 void intr_table();
 void reset_hdlr();
 void fiq_hdlr();
-void irq_hdlr();
+void irq_hdlr(void);
 void undef_hdlr();
 void swi_hdlr();
 void databort_hdlr();
@@ -34,7 +34,6 @@ void init()
 	int i = 0;
 
 	hal_init_led();
-	hal_usr_led_on(3);
 	
 	hal_init_ddr3_ram();
 	
@@ -42,7 +41,7 @@ void init()
 	* it will take long time to test all 512MB (around 20 min !)
 	*/
 	if(hal_ram_test(0xDEADCAFE, 1024 * 1024))
-		hal_usr_led_on(2);
+		hal_usr_led_on(3);
 	
 	/* set VBAR to point to DDR3 RAM end where we will
 	 * relocate our interrupt table
@@ -56,11 +55,11 @@ void init()
 	);
 
 	/* copy the interrupt table to the end of DDR3 RAM */
-	p32 = (u32 *)INTR_TABLE_START;
+	p32 = (u32 *)(INTR_TABLE_START);
 	f32 = (u32 *)intr_table;
 	for (i = 0; i < 8; ++i)
 		p32[i] = f32[i];
-	
+
 	/* copy the individual interrupt handlers below the intr table
 	 * in the DDR RAM - we're copying instructions inside each
 	 * function in reverse order descending from the interrupt table
@@ -80,7 +79,7 @@ void init()
 	p32 = copy_intr_hdlrs((u32 *)databort_hdlr, (u32 *)irq_hdlr, p32);	
 	/* 7. fiq_hdlr */
 	p32 = copy_intr_hdlrs((u32 *)irq_hdlr, (u32 *)fiq_hdlr, p32);
-	
+
 	/* initialize INTC registers */
 	/* set intr 75 (RTC) as highest priority and type as irq -- TRM 6.5.1.44 */
 	hal_init_intr(RTC_INTR_NUM, IRQ, 0);
@@ -110,10 +109,8 @@ __attribute__ ((naked)) void irq_hdlr(void)
 	/* save regs and link */
 	asm volatile("stmfd sp!, {r0-r12, lr} \n");
 	
-	WRITEREG32(GPIO1_SETDATAOUT, 0x1 << 21);
-
 	u32 val = 0;
-	//u32 led = 0;
+	u32 led = 0;
 
 	/* ignore spurious interrupts -- TRM 6.5.1.4 */
 	val = READREG32(INTC_SIR_IRQ);
@@ -136,12 +133,12 @@ __attribute__ ((naked)) void irq_hdlr(void)
 	 * whereas the hal_usr_led_toggle function resides on SRAM
 	 * so the branch instr which uses pc relative addressing will fail
 	 */
-	/*led = 0x1 << 21;
+	led = 0x1 << 21;
 	val = READREG32(GPIO1_SETDATAOUT);
 	if (val & led)
 		WRITEREG32(GPIO1_CLEARDATAOUT, led);
 	else
-		WRITEREG32(GPIO1_SETDATAOUT, led);	*/
+		WRITEREG32(GPIO1_SETDATAOUT, led);
 	
   
 intr_xit:
@@ -200,25 +197,21 @@ void reset_hdlr(void)
 __attribute__ ((naked)) void intr_table(void)
 {
 	asm volatile (
-		"ldr pc, reset_hdlr \n"
-		"ldr pc, undef_hdlr \n"
-		"ldr pc, swi_hdlr \n"
-		"ldr pc, progabort_hdlr \n"
-		"ldr pc, databort_hdlr \n"
+		"b reset_hdlr \n"
+		"b undef_hdlr \n"
+		"b swi_hdlr \n"
+		"b progabort_hdlr \n"
+		"b databort_hdlr \n"
 		"nop \n"
-		"ldr pc, irq_hdlr \n"
-		"ldr pc, fiq_hdlr \n"
+		"b irq_hdlr \n"
+		"b fiq_hdlr \n"
 	);  
 }
 
 void main()
 {
-	u32 *p = (u32 *)INTR_TABLE_START;
-	if (*p == 0xe51ff020)	
-		hal_usr_led_on(1);
-
 	while(1) {
-		;//hal_usr_led_toggle(1);
-		//hal_delay(1);
+		hal_usr_led_toggle(1);
+		hal_delay(1);
 	}
 }
