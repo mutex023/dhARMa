@@ -53,6 +53,32 @@ void hal_usr_led_off(u8 led_num)
 	WRITEREG32(GPIO1_CLEARDATAOUT, val);
 }
 
+/* 'prints' a 4-bit value using usr gpio leds */
+void hal_usr_led_print4(u8 val)
+{
+	WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << 21));
+	WRITEREG32(GPIO1_SETDATAOUT, (val & 0xF) << 21);
+}
+
+/* 'prints' a 32-bit value using usr gpio leds
+* a 2 second gap is given between 'printing' each 4 bit nibble */
+void hal_usr_led_print32(u32 val)
+{
+	u32 mask = 0xF;
+	u32 led = 0;
+	u8 cnt = 0;
+
+	while (mask) {
+		WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << 21));
+		led = val & mask;
+		led = led >> cnt;
+		WRITEREG32(GPIO1_SETDATAOUT, led << 21);
+		mask = mask << 4;
+		cnt += 4;
+		hal_delay(2);
+	}
+} 
+
 void hal_init_ddr_pll()
 {
 	u32 val = 0;
@@ -300,6 +326,7 @@ void hal_delay_1s()
 * Extrapolate that to the 1ghz AM3358 processor on BBB for a loop count to get a 1s delay,
 * but in reality the TI boot rom code would have set the proc to run at 500mhz instead of 1ghz 
 */	asm volatile (
+		"stmfd sp!, {r7-r9} \n"
 		"PROC_DELAY: \n"
 		"ldr r8, =4807692 \n"
 		"DELAY_LOOP1: \n"
@@ -314,6 +341,7 @@ void hal_delay_1s()
 		"sub r8, #1 \n"
 		"cmp r8, #0 \n"
 		"bne DELAY_LOOP1 \n"
+		"ldmfd sp!, {r7-r9} \n"
 	);
 }
 

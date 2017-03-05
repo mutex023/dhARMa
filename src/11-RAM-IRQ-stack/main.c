@@ -139,7 +139,6 @@ __attribute__ ((naked)) void irq_hdlr(void)
 		WRITEREG32(GPIO1_CLEARDATAOUT, led);
 	else
 		WRITEREG32(GPIO1_SETDATAOUT, led);
-	
   
 intr_xit:
 	/* allow pending/new IRQ's to occur */
@@ -215,3 +214,4 @@ void main()
 		hal_delay(1);
 	}
 }
+

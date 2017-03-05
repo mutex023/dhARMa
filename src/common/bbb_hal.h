@@ -171,6 +171,8 @@ void hal_init_led();
 void hal_usr_led_on(u8 led_num);
 void hal_usr_led_off(u8 led_num);
 void hal_usr_led_toggle(u8 led_num);
+void hal_usr_led_print32(u32 val);
+void hal_usr_led_print4(u8 val);
 void hal_init_ddr3_ram();
 u8 hal_ram_test(u32 val, u64 size);
 void hal_init_intr(u32 intr_num, intr_type_t intr_type, u8 priority);

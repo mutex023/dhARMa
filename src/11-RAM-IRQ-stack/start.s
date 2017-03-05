@@ -56,11 +56,6 @@ ZLOOP:
 	@branch to C code, 'init' function -- must branch with link !
 	@since we intend to return back to asm !
 	bl init
-	
-	@set usr1 led on
-	@ldr r4, =GPIO1_SETDATAOUT
-	@mov r5, #(1<<22)
-	@str r5, [r4]
 
 	@now we need to move the stack to the DDR3 RAM at 0x9FFFFAB8
 	@below the interrupt handlers
