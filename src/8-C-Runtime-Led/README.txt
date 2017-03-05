@@ -1,6 +1,6 @@
 8-C-Runtime-Led
 ===============================
-We now switch to bare metal C programming.
+We now switch to bare metal C programming. (whew ! finally)
 For this the initial setup of the stack and BSS segment is done by the assembly code in start.s
 and then jumps to C code in main.c
 The BSS segment has to be zeroed out.
@@ -16,7 +16,7 @@ The 'memmap' file is a linker script, required to specify the load address and B
 To build: 
 1) Make sure you have built the signgp utility first.
 2) Edit build.sh script to reflect your toolchain path
-2) ./build.sh mlo
+2) ./build.sh
 
 To run:
 This file has to be put onto an sd-card in raw format as described in the TI AM335x TRM - Sec 26.1.7.5.5

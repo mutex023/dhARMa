@@ -11,7 +11,7 @@ The sequence of registers to program and their values have been copied from TI's
 To build: 
 1) Make sure you have built the signgp utility first.
 2) Edit build.sh script to reflect your toolchain path
-2) ./build.sh mlo
+2) ./build.sh
 
 To run:
 This file has to be put onto an sd-card in raw format as described in the TI AM335x TRM - Sec 26.1.7.5.5
