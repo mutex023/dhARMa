@@ -2,12 +2,12 @@
 ======================
 This is an example of a simple loader which will relocate the entire
 program to the DDR3 RAM and begine execution from there. It is done in 3 steps:
-1. Test the SDRAM CONFIG register for its reset value, if its all zeroes then it indicates
+1. Test the GPIO1 usr led 0 pin, if its not set then it indicates
    that relocation has not happened, and the code sets up the stack on L3 RAM and initializes the DDR3.
 2. init will then copy the first 100kb of L3 RAM to the beginning of DDR3 RAM.
    and then jump to the start of DD3 at 0x80000000 to begin re-execution of the
    relocated program from '_start'
-3. So the test for SDRAM CONFIG would happen again and this time it would have been initialized as part
+3. So the test for GPIO1 usr led 0 pin would happen again and this time it would have been set as part
    of the init code to initialize DDR3. So, the startup code would now shift the bss and stack to DDR3
    and branch to main to continue the execution from DDR3 RAM.
 
