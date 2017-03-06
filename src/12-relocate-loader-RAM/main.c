@@ -11,7 +11,7 @@ u32 hola;
 void init()
 {
 	u32 *src = NULL, *dest = NULL;
-	u32 i = 10 * 1024;
+	u32 *end = NULL;
 
 	hal_init_led();
 
@@ -24,10 +24,11 @@ void init()
 		hal_assert();
 	}
 	
-	/* relocate first 10kb of L3 RAM to DDR3 */
+	/* relocate first 100kb of L3 RAM to DDR3 */
 	src = (u32 *)LOAD_ADDR;
 	dest = (u32 *)EMIF_DDR3_RAM_START_ADDR;
-	while(i--) {
+	end = (u32 *)(LOAD_ADDR + (100 * 1024));
+	while(src < end) {
 		*dest = *src;
 		++src;
 		++dest;
