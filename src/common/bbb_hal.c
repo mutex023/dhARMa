@@ -61,21 +61,27 @@ void hal_usr_led_print4(u8 val)
 }
 
 /* 'prints' a 32-bit value using usr gpio leds
-* a 2 second gap is given between 'printing' each 4 bit nibble */
+* a 2 second gap (indicated by a usr0 led toggle) is given between 'printing' each 4 bit nibble */
 void hal_usr_led_print32(u32 val)
 {
 	u32 mask = 0xF;
 	u32 led = 0;
 	u8 cnt = 0;
-
+	
+	WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << GPIO1_USRLED_SHIFT));
 	while (mask) {
-		WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << GPIO1_USRLED_SHIFT));
 		led = val & mask;
 		led = led >> cnt;
 		WRITEREG32(GPIO1_SETDATAOUT, led << GPIO1_USRLED_SHIFT);
 		mask = mask << 4;
 		cnt += 4;
 		hal_delay(2);
+		WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << GPIO1_USRLED_SHIFT));
+		hal_delay(1);
+		WRITEREG32(GPIO1_SETDATAOUT, 0x1 << GPIO1_USRLED_SHIFT);
+		hal_delay(1);
+		WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << GPIO1_USRLED_SHIFT));
+		hal_delay(1);
 	}
 } 
 
@@ -328,7 +334,7 @@ void hal_delay_1s()
 */	asm volatile (
 		"stmfd sp!, {r7-r9} \n"
 		"PROC_DELAY: \n"
-		"ldr r8, =4807692 \n"
+		"ldr r8, =2403846 \n"
 		"DELAY_LOOP1: \n"
 		"add r7, r7, r9 \n"
 		"add r7, r7, r9 \n"
