@@ -17,11 +17,11 @@ void hal_init_led()
 	/* clear the bits 21-24 to enable GPIO1 for output
 	* don't touch other bits, as they're used for sd card IO !!
 	*/
-	val &= ~(0xF << 21);
+	val &= ~(0xF << GPIO1_USRLED_SHIFT);
 	WRITEREG32(GPIO1_OE, val);
 
 	/* clear out gpio1-21,22,23,24 pins using data out register first*/
-	WRITEREG32(GPIO1_CLEARDATAOUT, 0x0F<<21);
+	WRITEREG32(GPIO1_CLEARDATAOUT, 0x0F<<GPIO1_USRLED_SHIFT);
 }
 
 void hal_usr_led_toggle(u8 led_num)
@@ -29,7 +29,7 @@ void hal_usr_led_toggle(u8 led_num)
 	u32 val = 0;
 	u32 led = 0;
 
-	led = 0x1 << (led_num + 21);
+	led = 0x1 << (led_num + GPIO1_USRLED_SHIFT);
 	val = READREG32(GPIO1_SETDATAOUT);
 	if (val & led)
 		WRITEREG32(GPIO1_CLEARDATAOUT, led);
@@ -41,7 +41,7 @@ void hal_usr_led_on(u8 led_num)
 {
 	u32 val = 0;
 	
-	val = 0x1 << (led_num + 21);
+	val = 0x1 << (led_num + GPIO1_USRLED_SHIFT);
 	WRITEREG32(GPIO1_SETDATAOUT, val);
 }
 
@@ -49,15 +49,15 @@ void hal_usr_led_off(u8 led_num)
 {
 	u32 val = 0;
 	
-	val = 0x1 << (led_num + 21);
+	val = 0x1 << (led_num + GPIO1_USRLED_SHIFT);
 	WRITEREG32(GPIO1_CLEARDATAOUT, val);
 }
 
 /* 'prints' a 4-bit value using usr gpio leds */
 void hal_usr_led_print4(u8 val)
 {
-	WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << 21));
-	WRITEREG32(GPIO1_SETDATAOUT, (val & 0xF) << 21);
+	WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << GPIO1_USRLED_SHIFT));
+	WRITEREG32(GPIO1_SETDATAOUT, (val & 0xF) << GPIO1_USRLED_SHIFT);
 }
 
 /* 'prints' a 32-bit value using usr gpio leds
@@ -69,10 +69,10 @@ void hal_usr_led_print32(u32 val)
 	u8 cnt = 0;
 
 	while (mask) {
-		WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << 21));
+		WRITEREG32(GPIO1_CLEARDATAOUT, (0xF << GPIO1_USRLED_SHIFT));
 		led = val & mask;
 		led = led >> cnt;
-		WRITEREG32(GPIO1_SETDATAOUT, led << 21);
+		WRITEREG32(GPIO1_SETDATAOUT, led << GPIO1_USRLED_SHIFT);
 		mask = mask << 4;
 		cnt += 4;
 		hal_delay(2);
@@ -349,4 +349,14 @@ void hal_delay(u32 sec)
 {
 	while(sec--)
 		hal_delay_1s();
+}
+
+void hal_assert()
+{
+	while (1) {
+		hal_usr_led_print4(0xF);
+		hal_delay(1);
+		hal_usr_led_print4(0x0);
+		hal_delay(1);
+	}
 }

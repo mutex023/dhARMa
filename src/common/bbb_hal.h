@@ -10,10 +10,11 @@
 #include "types.h"
 
 /* addresses - refer TRM of AM335x */
-#define LOAD_ADDR 0x402f0400
+#define LOAD_ADDR 0x402F0400
 
 #define CM_PER_GPIO1_CLKCTRL 0x44e000AC
 #define GPIO1_OE 0x4804C134
+#define GPIO1_USRLED_SHIFT 21
 #define GPIO1_SETDATAOUT 0x4804C194
 #define GPIO1_CLEARDATAOUT 0x4804C190
 #define GPIO1_DATAOUT 0x4804C13C
@@ -178,5 +179,6 @@ u8 hal_ram_test(u32 val, u64 size);
 void hal_init_intr(u32 intr_num, intr_type_t intr_type, u8 priority);
 void hal_init_rtc_intr(rtc_intr_period_t period, rtc_intr_periodicity_t periodicity);
 void hal_delay(u32 sec);
+void hal_assert();
 
 #endif /*__BBB_HAL_H__*/
