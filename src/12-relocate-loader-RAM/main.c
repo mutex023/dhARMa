@@ -1,5 +1,5 @@
-/* Bare metal C program to initialize the onboard 512MB MIcron DDR3 RAM
-* on BBB and place the stack on RAM.
+/* Bare metal C program to init DDR3 RAM and relocate itself there
+* to begin execution from SDRAM
 * 
 * @author: muteX023
 */

@@ -64,13 +64,17 @@
 #define DDR3_CTRL_MODULE_DDR_IO_CTRL_VAL 0xefffffff
 #define CTRL_MODULE_DDR_CKE_CTRL_OFFSET 0x131C
 #define CTRL_MODULE_EMIF_SDRAM_CONFIG 0x110
+#define CTRL_MODULE_CONF_UART0_RXD_OFFSET 0x970
+#define CTRL_MODULE_CONF_UART0_TXD_OFFSET 0x974
 
 #define CM_WKUP_REGS_BASE 0x44E00400
+#define CM_WKUP_CLKSTCTRL_OFFSET 0x0
 #define CM_WKUP_CM_CLKMODE_DPLL_DDR_OFFSET 0x94
 #define CM_WKUP_CM_IDLEST_DPLL_DDR_OFFSET 0x34
 #define CM_WKUP_CM_CLKSEL_DPLL_DDR_OFFSET 0x40
 #define CM_WKUP_CM_DIV_M2_DPLL_DDR_OFFSET 0xA0
 #define CM_WKUP_CONTROL_CLKCTRL_OFFSET 0x4
+#define CM_WKUP_UART0_CLKCTRL_OFFSET 0xB4
 
 #define DDR3_FREQ 303  /* if it doesn't work try 266 ? */
 #define DDRPLL_N 23
@@ -81,6 +85,8 @@
 #define CM_PER_EMIF_FW_CLKCTRL_OFFSET 0xD0
 #define CM_PER_EMIF_CLKCTRL_OFFSET 0x28
 #define CM_PER_L3_CLKSTCTRL_OFFSET 0xC
+#define CM_PER_L4HS_CLKSTCTRL_OFFSET 0x11C
+#define CM_PER_UART1_CLKCTRL_OFFSET 0x6C
 
 #define CMD0_REG_PHY_CTRL_SLAVE_RATIO_0_OFFSET 0X1C
 #define DDR3_CMD0_SLAVE_RATIO_0_VAL 0x40 
@@ -145,9 +151,16 @@
 
 #define EMIF_DDR3_RAM_START_ADDR 0x80000000
 
+#define UART0_REGS_BASE 0x44E09000
+#define UART0_SYSC_OFFSET 0x54
+#define UART0_SYSS_OFFSET 0x58
+#define UART0_LSR_OFFSET 0x14
+
 /* read and write register macros */
 #define WRITEREG32(addr, val) ( *(volatile unsigned int *)(addr) = (val))
 #define READREG32(addr) ( *(volatile unsigned int *)(addr) )
+#define WRITEREG8(addr, val) ( *(volatile unsigned char *)(addr) = (val))
+#define READREG8(addr) ( *(volatile unsigned char *)(addr) )
 
 
 typedef enum {
