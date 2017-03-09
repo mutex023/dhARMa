@@ -5,6 +5,17 @@
 
 #include "bbb_hal.h"
 
+#define INTR_TABLE_START 0x9FFFFFC0 /* 32 + 32 bytes below the end of RAM */
+
+void hal_intr_table();
+void hal_reset_hdlr();
+void hal_fiq_hdlr();
+void hal_irq_hdlr(void);
+void hal_undef_hdlr();
+void hal_swi_hdlr();
+void hal_databort_hdlr();
+void hal_progabort_hdlr();
+
 void hal_init_led()
 {
 	u32 val = 0;
@@ -323,6 +334,376 @@ void hal_init_rtc_intr(rtc_intr_period_t period, rtc_intr_periodicity_t periodic
 	 * -- TRM 6.3 & 6.5.1.29
 	*/
     WRITEREG32(INTC_MIR2_CLEAR, 0x01 << 11);
+}
+
+void hal_uart_putchar(u8 val)
+{
+	/* Wait for Tx hold reg to be empty - TRM 19.5.1.12 */
+	while (!(READREG8(UART0_REGS_BASE + 0x14) & 0x20))
+		;
+	if (val == '\n')
+		WRITEREG8(UART0_REGS_BASE, '\r');
+	WRITEREG8(UART0_REGS_BASE, val);
+}
+
+void hal_uart_putstr(char *str)
+{
+	if (!str)
+		return;
+	
+	while(*str) {
+		hal_uart_putchar(*str);
+		str++;
+	}
+}
+
+void hal_init_uart()
+{
+	u32 val = 0;
+
+	/* enable receiver and pullup in uart0 rxd conf 
+	 * disable receiver and pullup in uart0 txd conf - TRM 9.3.51 */
+	WRITEREG32(CTRL_MODULE_REG_BASE + CTRL_MODULE_CONF_UART0_RXD_OFFSET, 0x30);
+	WRITEREG32(CTRL_MODULE_REG_BASE + CTRL_MODULE_CONF_UART0_TXD_OFFSET, 0x0);
+	
+	/* start a sw forced wake up on the pwr domain - TRM 8.1.12.2.1 & 8.1.12.1.53 */
+	val = READREG32(CM_WKUP_REGS_BASE + CM_WKUP_CLKSTCTRL_OFFSET);
+	val &= ~0x3;
+	val |= 0x2;
+	WRITEREG32(CM_WKUP_REGS_BASE + CM_WKUP_CLKSTCTRL_OFFSET, val);
+
+	val = READREG32(CM_PER_REGS_BASE + CM_PER_L4HS_CLKSTCTRL_OFFSET);
+	val &= ~0x3;
+	val |= 0x2;
+	WRITEREG32(CM_PER_REGS_BASE + CM_PER_L4HS_CLKSTCTRL_OFFSET, val);
+
+
+	/* enable UART0 - uart module-1 clk - TRM 8.1.12.2.46 & 8.1.12.1.23 */
+	val = READREG32(CM_WKUP_REGS_BASE + CM_WKUP_UART0_CLKCTRL_OFFSET);
+	val &= ~0x3;
+	val |= 0x2;
+	WRITEREG32(CM_WKUP_REGS_BASE + CM_WKUP_UART0_CLKCTRL_OFFSET, val);
+
+	val = READREG32(CM_PER_REGS_BASE + CM_PER_UART1_CLKCTRL_OFFSET);
+	val &= ~0x3;
+	val |= 0x2;
+	WRITEREG32(CM_PER_REGS_BASE + CM_PER_UART1_CLKCTRL_OFFSET, val);
+
+	/* see TRM 19.4.1 for programming UART */
+	
+	/* perform a soft reset of uart module - TRM 19.5.1.31 */
+	val = READREG32(UART0_REGS_BASE + UART0_SYSC_OFFSET);
+	val |= 0x2;
+	WRITEREG32(UART0_REGS_BASE + UART0_SYSC_OFFSET, val);
+
+	/* wait for reset to complete */
+	while ( !(READREG32(UART0_REGS_BASE + UART0_SYSS_OFFSET) & 0x1) )
+		;
+
+	/* disable pwr mgmt idle request ack in UART0 - TRM 19.5.1.31 */
+	val = READREG32(UART0_REGS_BASE + UART0_SYSC_OFFSET);
+	val |= 0x1 << 3;
+	WRITEREG32(UART0_REGS_BASE + UART0_SYSC_OFFSET, val);
+
+	/* wait for TX FIFO and shift regs to be empty - TRM 19.5.1.12 */
+	while (!(READREG8(UART0_REGS_BASE + UART0_LSR_OFFSET) & 0x40))
+		;
+
+	/* disable all UART interrupts and sleep mode - TRM 19.5.1.3 */
+	WRITEREG8(UART0_REGS_BASE + 0x4, 0);
+	
+	/* disable UART - TRM 19.5.1.19 */
+	WRITEREG8(UART0_REGS_BASE + 0x20, 7);
+	
+	/* configure - 
+	 * Baud 115,200
+	 * Bits 8
+	 * Parity N
+	 * Stop Bits 1
+	 * FLow ctrl None
+	*/
+    WRITEREG8(UART0_REGS_BASE + 0xC, ~0x7c);
+    WRITEREG8(UART0_REGS_BASE + 0x0, 0);
+    WRITEREG8(UART0_REGS_BASE + 0x4, 0);
+    WRITEREG8(UART0_REGS_BASE + 0xC, 3);
+    WRITEREG8(UART0_REGS_BASE + 0x10, 3);
+    WRITEREG8(UART0_REGS_BASE + 0x8, 7);
+    WRITEREG8(UART0_REGS_BASE + 0xC, ~0x7c);
+    WRITEREG8(UART0_REGS_BASE + 0x0, 26);
+    WRITEREG8(UART0_REGS_BASE + 0x4, 0);
+    WRITEREG8(UART0_REGS_BASE + 0xC, 3);
+    WRITEREG8(UART0_REGS_BASE + 0x20, 0);
+	
+	/* turn on usr1 led */
+	WRITEREG32(GPIO1_SETDATAOUT, 0x01<<22);
+}
+
+/* this sets up uart, DDR3 and relocates durga to DDR3 RAM
+ * this code is execed from internal L3 RAM
+*/
+void hal_init_platform_stage1()
+{
+	u32 *src = NULL, *dest = NULL;
+	u32 *end = NULL;
+	char str[32];
+
+	hal_init_led();
+	
+	hal_init_uart();
+	
+	/* Note - we cannot pass const strings like below :
+	 * -- hal_uart_putstr("DURGA stage 1 is loading...\n"); --
+	 * because the BSS segment has not yet been initialized at this stage.
+	 * the compiler will actually allocate these strings on BSS
+	 * so using these kind of strings will result in a crash
+	 * we can however write such code in stage2 after BSS has been setup
+	*/
+	str[0] = 'D'; str[1] ='U';
+	str[2] = 'R'; str[3] = 'G';
+	str[4] = 'A'; str[5] = ' ';
+	str[6] = 's'; str[7] = 't';
+	str[8] = 'a'; str[9] = 'g';
+	str[10] = 'e'; str[11] = '1';
+	str[12] = ' '; str[13] =  'l';
+	str[14] = 'o'; str[15] = 'a';
+	str[16] = 'd'; str[17] = 'i';
+	str[18] = 'n'; str[19] = 'g';
+	str[20] = '.'; str[21] = '.';
+	str[22] = '.'; str[23] = '\n';
+	str[24] = 0;
+	hal_uart_putstr(str);
+	
+	hal_init_ddr3_ram();
+	
+	//hal_uart_putstr("RAM check...\n");
+	/* test the first 1MB DDR RAM onboard BBB
+	* it will take long time to test all 512MB (around 20 min !)
+	*/
+	if (!hal_ram_test(0xDEADFACE, 1024 * 1024)) {
+		//hal_uart_putstr("RAM check failed !\n");
+		hal_assert();
+	}
+	//hal_uart_putstr("RAM check pass.\n");
+	
+	//hal_uart_putstr("relocating.....");
+	/* relocate first 100kb of L3 RAM to DDR3 */
+	src = (u32 *)LOAD_ADDR;
+	dest = (u32 *)EMIF_DDR3_RAM_START_ADDR;
+	end = (u32 *)(LOAD_ADDR + (100 * 1024));
+	while(src < end) {
+		*dest = *src;
+		++src;
+		++dest;
+	}
+	//hal_uart_putstr("DONE.\n");
+
+	hal_usr_led_on(0);
+	
+	/* back to asm which will exec jump to DDR3 */
+	return;
+}
+
+void hal_default_fiq_hdlr(void)
+{
+	/* save regs and link */
+	asm volatile("stmfd sp!, {r0-r12, lr} \n");
+	
+	hal_uart_putstr("FIQ ! \n");
+
+	/* return from FIQ -- see Cortex A8 TRM from ARM, section 2.15.4 */
+	asm volatile("subs pc, lr, #4 \n");
+}
+/* see ARM gcc function attributes:
+ * https://gcc.gnu.org/onlinedocs/gcc/ARM-Function-Attributes.html#ARM-Function-Attributes
+ * 'naked' attribute does not generate stack prologue/epilogue instructions
+*/
+__attribute__ ((naked))
+void hal_default_irq_hdlr(void)
+{
+	/* save regs and link */
+	asm volatile("stmfd sp!, {r0-r12, lr} \n");
+	
+	u32 val = 0;
+	static u8 c = 33;
+
+	/* ignore spurious interrupts -- TRM 6.5.1.4 */
+	val = READREG32(INTC_SIR_IRQ);
+	if (val & 0xFFFFFF80)
+		goto intr_xit;
+  
+	/* get the interrupt number and check if it is from RTC -- TRM 6.5.1.4 */
+	if ((val & 0x7F) != RTC_INTR_NUM)
+		goto intr_xit;
+
+	/* disable RTC interrupts till you process current interrupt
+	 * for this, set the interrupt mask bit for the RTC interrupt
+	 * - i.e, the 11th bit in MIR2, bits0-63 are in MIR0-1 -- TRM 6.3 & 6.5.1.31
+	*/
+	WRITEREG32(INTC_MIR2_SET, 0x01 << 11);
+
+	/* process the interrupt - print to uart an ascii chart */
+	hal_uart_putstr("IRQ - RTC interrupt #75 - ");
+	hal_uart_putchar(c++);
+	hal_uart_putchar('\n');
+	if (c > 126)
+		c = 33;
+  
+intr_xit:
+	/* allow pending/new IRQ's to occur */
+	WRITEREG32(INTC_CTRL, 1);
+
+	/* restore regs and link */
+	asm volatile ("ldmfd sp!, {r0-r12, lr} \n");
+	
+	/* re-enable RTC interrupts */
+	WRITEREG32(INTC_MIR2_CLEAR, 0x01 << 11);
+
+	/* return from IRQ -- see Cortex A8 TRM from ARM, section 2.15.1 */
+	asm volatile("subs pc, lr, #4 \n");
+}
+
+__attribute__ ((naked))
+void hal_default_databort_hdlr(void)
+{
+	hal_uart_putstr("DATA ABORT ! \n");
+	hal_assert();
+}
+
+__attribute__ ((naked))
+void hal_default_progabort_hdlr(void)
+{
+	hal_uart_putstr("PROGRAM ABORT ! \n");
+	hal_assert();
+}
+
+__attribute__ ((naked))
+void hal_default_swi_hdlr(void)
+{
+	/* save regs and link */
+	asm volatile("stmfd sp!, {r0-r12, lr} \n");
+	
+	hal_uart_putstr("SWI ! \n");
+
+	/* return from SWI -- see Cortex A8 TRM from ARM, section 2.15.8 */
+	asm volatile("mov pc, lr \n");
+}
+
+__attribute__ ((naked))
+void hal_default_undef_hdlr(void)
+{
+	hal_uart_putstr("UNDEFINED INSTR ! \n");
+	hal_assert();
+}
+
+__attribute__ ((naked))
+void hal_default_reset_hdlr(void)
+{
+	hal_uart_putstr("RESET ! \n");
+	hal_assert();
+}
+
+/* see ARM gcc function attributes:
+ * https://gcc.gnu.org/onlinedocs/gcc/ARM-Function-Attributes.html#ARM-Function-Attributes
+ * 'naked' attribute does not generate stack prologue/epilogue instructions
+*/
+__attribute__ ((naked))
+void hal_intr_table(void)
+{
+	asm volatile (
+		"ldr pc, [pc, #24] \n"
+		"ldr pc, [pc, #24] \n"
+		"ldr pc, [pc, #24] \n"
+		"ldr pc, [pc, #24] \n"
+		"ldr pc, [pc, #24] \n"
+		"nop \n"
+		"ldr pc, [pc, #20] \n"
+		"ldr pc, [pc, #20] \n"
+	);  
+}
+
+void hal_register_exception_handler(exception_type_t type, u32 *handler)
+{
+	u32 *p = (u32 *)INTR_TABLE_START;
+	p += type;
+	*p = (u32)handler;	
+}
+
+void hal_disable_intr()
+{
+	asm volatile (
+		"stmfd sp!, {r0} \n"
+		"mrs r0, cpsr \n"
+		"orr r0, r0, #0xC0 \n" /* disable FIQ and IRQ */
+		"msr cpsr, r0 \n"
+		"ldmfd sp!, {r0} \n"
+	);
+}
+
+void hal_enable_intr()
+{
+	asm volatile (
+		"stmfd sp!, {r0} \n"
+		"mrs r0, cpsr \n"
+		"bic r0, r0, #0x80 \n" /* disable FIQ, but enable IRQ */
+		"msr cpsr, r0 \n"
+		"ldmfd sp!, {r0} \n"
+	);
+}
+
+/* this initializes interrupts and intr handlers 
+ * this code is execed from DDR3 RAM
+*/
+void hal_init_platform_stage2()
+{
+	u32 *p32 = NULL, *f32 = NULL;
+	int i = 0;
+
+	hal_uart_putstr("DURGA stage 2 is loading.... \n");
+	hal_uart_putstr("set VBAR...\n");
+	/* set VBAR to point to DDR3 RAM end where we will
+	 * relocate our interrupt table
+	*/
+	asm volatile (
+		"mrc p15, #0, r0, c1, c0, #0 \n"
+		"bic r0, #(1 << 13) \n"
+		"mcr p15, #0, r0, c1, c0, #0 \n"
+		"ldr r0, =0x9FFFFFC0 \n"
+		"mcr p15, #0, r0, c12, c0, #0 \n"
+	);
+
+	hal_uart_putstr("copy intr table...\n");
+	/* copy the interrupt table to the end of DDR3 RAM */
+	p32 = (u32 *)(INTR_TABLE_START);
+	f32 = (u32 *)hal_intr_table;
+	for (i = 0; i < 8; ++i)
+		p32[i] = f32[i];
+
+	hal_uart_putstr("install default exception handlers...\n");
+	/* install default exception handlers */
+	hal_register_exception_handler(EXCEPTION_RESET, (u32 *)hal_default_reset_hdlr);
+	hal_register_exception_handler(EXCEPTION_UNDEF, (u32 *)hal_default_undef_hdlr);
+	hal_register_exception_handler(EXCEPTION_SWI, (u32 *)hal_default_swi_hdlr);
+	hal_register_exception_handler(EXCEPTION_PROGABORT, (u32 *)hal_default_progabort_hdlr);
+	hal_register_exception_handler(EXCEPTION_DATABORT, (u32 *)hal_default_databort_hdlr);
+	hal_register_exception_handler(EXCEPTION_IRQ, (u32 *)hal_default_irq_hdlr);
+	hal_register_exception_handler(EXCEPTION_FIQ, (u32 *)hal_default_fiq_hdlr);
+	
+	hal_uart_putstr("init RTC...\n");
+	/* initialize INTC registers */
+	/* set intr 75 (RTC) as highest priority and type as irq -- TRM 6.5.1.44 */
+	hal_init_intr(RTC_INTR_NUM, IRQ, 0);
+	
+	/* initialize RTC and RTC interrupts */
+	hal_init_rtc_intr(EVERY_SEC, RTC_INTR_PERIODIC_ENABLE);
+	
+	hal_uart_putstr("enabling ARM interrupts...\n");
+	/* enable interrupts on ARM side */
+	hal_enable_intr();
+	
+	hal_uart_putstr("DONE \n");
+
+	/* back to asm which will jump to main */
+	return;
 }
 
 void hal_delay_1s()
