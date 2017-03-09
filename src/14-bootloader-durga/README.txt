@@ -1,4 +1,4 @@
-13-bootloader-durga
+14-bootloader-durga
 ======================
 We now have most of the pieces in place to write the first version of our bootloader 'durga'.
 This is a stage-1 bootloader which will do the following:
