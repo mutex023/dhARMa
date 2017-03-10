@@ -203,6 +203,7 @@ void hal_init_intr(u32 intr_num, intr_type_t intr_type, u8 priority);
 void hal_init_rtc_intr(rtc_intr_period_t period, rtc_intr_periodicity_t periodicity);
 void hal_uart_putchar(u8 val);
 void hal_uart_putstr(char *str);
+void hal_uart_put32(u32 val);
 void hal_init_uart();
 void hal_register_exception_handler(exception_type_t type, u32 *handler);
 void hal_delay(u32 sec);

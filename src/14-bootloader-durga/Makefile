@@ -7,7 +7,7 @@ all :
 	$(CROSS)gcc $(CFLAGS) -c durga.c -o durga.o
 	$(CROSS)gcc $(CFLAGS) -c ../common/bbb_hal.c -o bbb_hal.o
 	$(CROSS)ld -o mlo -T memmap start.o bbb_hal.o durga.o 
-	$(CROSS)objdump -M reg-names-raw -D mlo > mlo.obj
+	$(CROSS)objdump --disassemble-zeroes -M reg-names-raw -D mlo > mlo.obj
 	$(CROSS)objcopy mlo mlo.bin -O binary
 
 clean :

@@ -8,14 +8,14 @@ MEMORY
 SECTIONS
 {
    .text : { *(.text*) } > ddr3_ram
-   __data_rom_start__ = .;
-   .data : {
+   .rodata : { *(.rodata*) } > ddr3_ram
+   .data ALIGN(0x4) : {
     __data_start__ = .;
     *(.data*)
    } > ddr3_ram
    __data_end__ = .;
    __data_size__ = __data_end__ - __data_start__;
-   .bss  : {
+   .bss ALIGN(0x4) : {
    __bss_start__ = .;
    *(.bss*)
    } > ddr3_ram

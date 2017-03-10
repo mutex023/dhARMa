@@ -357,6 +357,29 @@ void hal_uart_putstr(char *str)
 	}
 }
 
+void hal_uart_put32(u32 val)
+{
+	u32 mask = 0xF0000000;
+	u8 cnt = 28;
+	u32 op = 0;
+	
+	hal_uart_putchar('0');
+	hal_uart_putchar('x');
+	
+	while (mask) {
+		op = val & mask;
+		op = op >> cnt;
+		if (op >= 0 && op <= 9)
+			hal_uart_putchar('0' + op);
+		else if (op >= 0xA && op <= 0xF)
+			hal_uart_putchar('A' + (op - 0xA));
+		mask = mask >> 4;
+		cnt -= 4;
+	}
+
+	hal_uart_putchar('\n');
+}
+
 void hal_init_uart()
 {
 	u32 val = 0;
@@ -453,10 +476,11 @@ void hal_init_platform_stage1()
 	
 	/* Note - we cannot pass const strings like below :
 	 * -- hal_uart_putstr("DURGA stage 1 is loading...\n"); --
-	 * because the BSS segment has not yet been initialized at this stage.
-	 * the compiler will actually allocate these strings on BSS
+	 * because .rodata segment resides on address > 0x80000000 (in DDR3)
+	 * due to the linker script and these strings are alloc'd
+	 * on the .rodata (read only data segment)
 	 * so using these kind of strings will result in a crash
-	 * we can however write such code in stage2 after BSS has been setup
+	 * we can however write such code in stage2 after DDR3 has been initialized
 	*/
 	str[0] = 'D'; str[1] ='U';
 	str[2] = 'R'; str[3] = 'G';
@@ -522,9 +546,10 @@ void hal_default_irq_hdlr(void)
 {
 	/* save regs and link */
 	asm volatile("stmfd sp!, {r0-r12, lr} \n");
-	
+
 	u32 val = 0;
 	static u8 c = 33;
+	static u8 hr = 0, min = 0, sec = 0;
 
 	/* ignore spurious interrupts -- TRM 6.5.1.4 */
 	val = READREG32(INTC_SIR_IRQ);
@@ -541,8 +566,31 @@ void hal_default_irq_hdlr(void)
 	*/
 	WRITEREG32(INTC_MIR2_SET, 0x01 << 11);
 
-	/* process the interrupt - print to uart an ascii chart */
-	hal_uart_putstr("IRQ - RTC interrupt #75 - ");
+	/* process the interrupt - print to uart an ascii chart 
+	 * and system up time 
+	*/
+	++sec;
+	if (sec >= 60) {
+		sec = 0;
+		++min;
+		if (min >= 60) {
+			min = 0;
+			++hr;
+			if (hr >= 24) {
+				hr = 0;
+			}
+		}
+	} 
+	hal_uart_putstr("IRQ - ");
+	hal_uart_putchar(hr/10 + '0');
+	hal_uart_putchar(hr%10 + '0');
+	hal_uart_putchar(':');
+	hal_uart_putchar(min/10 + '0');
+	hal_uart_putchar(min%10 + '0');
+	hal_uart_putchar(':');
+	hal_uart_putchar(sec/10 + '0');
+	hal_uart_putchar(sec%10 + '0');
+	hal_uart_putstr(" - ");
 	hal_uart_putchar(c++);
 	hal_uart_putchar('\n');
 	if (c > 126)

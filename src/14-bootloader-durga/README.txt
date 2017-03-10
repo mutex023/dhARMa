@@ -39,6 +39,13 @@ We shall keep adding code to Durga and fleshing it out as and when new modules a
 For example - wall clock time, file system read, advanced intr handling,
 hdmi interfacing (to show boot progress on screen), etc..
 
+Another change is that the linker script has to be changed to force alignment of data and bss sections to
+4-byte boundaries, otherwise if say a static u8 initialized variable is declared and the program
+has some other u8 global uninitialized variables, then this will cause the bss to start at non-4-btye boundaries
+leading to an exception when trying to zero out the bss in start.s
+No need to align .rodata, as it starts soon after the data section and hence will be automatically aligned
+since all instructions are 4 byte in ARM.
+
 To build: 
 1) Make sure you have built the signgp utility first.
 2) Edit build.sh script to reflect your toolchain path
