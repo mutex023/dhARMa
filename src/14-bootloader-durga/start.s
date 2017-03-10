@@ -50,10 +50,26 @@ _start:
     sub r3, r3, #STACK_SIZE
     mov sp, r3    
 
+    @switch to abort mode and setup abort mode stack
+    mrs r1, cpsr
+    bic r1, r1, #0x1F	    
+    orr r1, r1, #0x17
+    msr cpsr, r1
+    sub r3, r3, #STACK_SIZE
+    mov sp, r3
+
     @switch to irq mode and setup irq stack -- ARM sys dev guide -- 9.2.4
     mrs r1, cpsr
     bic r1, r1, #0x1F	    
     orr r1, r1, #0x12
+    msr cpsr, r1
+    sub r3, r3, #STACK_SIZE
+    mov sp, r3
+    
+    @switch to fiq mode and setup fiq stack
+    mrs r1, cpsr
+    bic r1, r1, #0x1F	    
+    orr r1, r1, #0x11
     msr cpsr, r1
     sub r3, r3, #STACK_SIZE
     mov sp, r3
@@ -100,6 +116,14 @@ RAM_STACK:
 	sub r3, r3, #STACK_SIZE
 	mov sp, r3    
 
+    @switch to abort mode and setup abort mode stack
+    mrs r1, cpsr
+    bic r1, r1, #0x1F	    
+    orr r1, r1, #0x17
+    msr cpsr, r1
+    sub r3, r3, #STACK_SIZE
+    mov sp, r3
+
 	@switch to irq mode and setup irq stack -- ARM sys dev guide -- 9.2.4
 	mrs r1, cpsr
 	bic r1, r1, #0x1F	    
@@ -107,7 +131,15 @@ RAM_STACK:
 	msr cpsr, r1
 	sub r3, r3, #STACK_SIZE
 	mov sp, r3
-    
+
+    @switch to fiq mode and setup fiq stack
+    mrs r1, cpsr
+    bic r1, r1, #0x1F	    
+    orr r1, r1, #0x11
+    msr cpsr, r1
+    sub r3, r3, #STACK_SIZE
+    mov sp, r3
+
 	@back to supervisor mode
 	mrs r1, cpsr
 	bic r1, r1, #0x1F	

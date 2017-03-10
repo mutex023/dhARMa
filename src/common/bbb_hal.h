@@ -190,6 +190,27 @@ typedef enum {
 	EXCEPTION_FIQ
 } exception_type_t;
 
+typedef enum {
+	ALIGNMENT_FAULT = 0x1,
+	DEBUG_EVENT = 0x2,
+	SEC_ACCESS_FAULT = 0x3,
+	INSTR_CACHE_FAULT = 0x4,
+	SEC_TRANS_FAULT = 0x5,
+	PAGE_ACCESS_FAULT = 0x6,
+	PAGE_TRANS_FAULT = 0x7,
+	SEC_DOM_FAULT = 0x9,
+	PAGE_DOM_FAULT = 0xB,
+	L1_EXTERNAL_ABORT = 0xC,
+	SEC_PERM_FAULT = 0xD,
+	L2_EXTERNAL_ABORT = 0xE,
+	PAGE_PERM_FAULT = 0xF,
+	NON_TRANS_ABORT = 0x10,
+	IMPRECISE_EXT_ABORT = 0x16,
+	IMPRECISE_ERR_ECC = 0x18,
+	L1_PARITY_ERROR = 0x1C,
+	L2_PARITY_ERROR = 0x1E
+} fault_type_t;
+
 /* prototypes API*/
 void hal_init_led();
 void hal_usr_led_on(u8 led_num);

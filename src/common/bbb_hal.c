@@ -8,13 +8,13 @@
 #define INTR_TABLE_START 0x9FFFFFC0 /* 32 + 32 bytes below the end of RAM */
 
 void hal_intr_table();
-void hal_reset_hdlr();
-void hal_fiq_hdlr();
-void hal_irq_hdlr(void);
-void hal_undef_hdlr();
-void hal_swi_hdlr();
-void hal_databort_hdlr();
-void hal_progabort_hdlr();
+void hal_default_reset_hdlr();
+void hal_default_fiq_hdlr();
+void hal_default_irq_hdlr(void);
+void hal_default_undef_hdlr();
+void hal_default_swi_hdlr();
+void hal_default_databort_hdlr();
+void hal_default_progabort_hdlr();
 
 void hal_init_led()
 {
@@ -461,6 +461,49 @@ void hal_init_uart()
 	WRITEREG32(GPIO1_SETDATAOUT, 0x01<<22);
 }
 
+char *hal_get_fault_typestr(u16 fault)
+{
+	switch (fault) {
+		case ALIGNMENT_FAULT:
+			return "alignment fault";
+		case DEBUG_EVENT:
+			return "debug event";
+		case SEC_ACCESS_FAULT:
+			return "section access flag fault";
+		case INSTR_CACHE_FAULT:
+			return "instruction cache maintainence fault";
+		case SEC_TRANS_FAULT:
+			return "section translation fault";
+		case PAGE_ACCESS_FAULT:
+			return "page access flag fault";
+		case PAGE_TRANS_FAULT:
+			return "page translation fault";
+		case SEC_DOM_FAULT:
+			return "section domain fault";
+		case PAGE_DOM_FAULT:
+			return "page domain fault";
+		case L1_EXTERNAL_ABORT:
+			return "L1 translation, precise external abort";
+		case SEC_PERM_FAULT:
+			return "section permission fault";
+		case L2_EXTERNAL_ABORT:
+			return "L2 translation, precise external abort";
+		case PAGE_PERM_FAULT:
+			return "page permission fault";
+		case NON_TRANS_ABORT:
+			return "non-translation, precise external abort";
+		case IMPRECISE_EXT_ABORT:
+			return "imprecise external abort";
+		case IMPRECISE_ERR_ECC:
+			return "imprecise error, parity or ECC";
+		case L1_PARITY_ERROR:
+			return "L1 translation, precise parity error";
+		case L2_PARITY_ERROR:
+			return "L2 translation, precise parity error";
+	}
+	return "unknown fault !";
+}
+
 /* this sets up uart, DDR3 and relocates durga to DDR3 RAM
  * this code is execed from internal L3 RAM
 */
@@ -477,7 +520,7 @@ void hal_init_platform_stage1()
 	/* Note - we cannot pass const strings like below :
 	 * -- hal_uart_putstr("DURGA stage 1 is loading...\n"); --
 	 * because .rodata segment resides on address > 0x80000000 (in DDR3)
-	 * due to the linker script and these strings are alloc'd
+	 * due to the linker script, and these strings are alloc'd
 	 * on the .rodata (read only data segment)
 	 * so using these kind of strings will result in a crash
 	 * we can however write such code in stage2 after DDR3 has been initialized
@@ -499,17 +542,13 @@ void hal_init_platform_stage1()
 	
 	hal_init_ddr3_ram();
 	
-	//hal_uart_putstr("RAM check...\n");
 	/* test the first 1MB DDR RAM onboard BBB
 	* it will take long time to test all 512MB (around 20 min !)
 	*/
 	if (!hal_ram_test(0xDEADFACE, 1024 * 1024)) {
-		//hal_uart_putstr("RAM check failed !\n");
 		hal_assert();
 	}
-	//hal_uart_putstr("RAM check pass.\n");
-	
-	//hal_uart_putstr("relocating.....");
+
 	/* relocate first 100kb of L3 RAM to DDR3 */
 	src = (u32 *)LOAD_ADDR;
 	dest = (u32 *)EMIF_DDR3_RAM_START_ADDR;
@@ -519,34 +558,25 @@ void hal_init_platform_stage1()
 		++src;
 		++dest;
 	}
-	//hal_uart_putstr("DONE.\n");
 
 	hal_usr_led_on(0);
-	
+
 	/* back to asm which will exec jump to DDR3 */
 	return;
 }
 
+__attribute__ ((interrupt ("FIQ")))
 void hal_default_fiq_hdlr(void)
 {
-	/* save regs and link */
-	asm volatile("stmfd sp!, {r0-r12, lr} \n");
-	
 	hal_uart_putstr("FIQ ! \n");
-
-	/* return from FIQ -- see Cortex A8 TRM from ARM, section 2.15.4 */
-	asm volatile("subs pc, lr, #4 \n");
 }
+
 /* see ARM gcc function attributes:
  * https://gcc.gnu.org/onlinedocs/gcc/ARM-Function-Attributes.html#ARM-Function-Attributes
- * 'naked' attribute does not generate stack prologue/epilogue instructions
 */
-__attribute__ ((naked))
+__attribute__ ((interrupt ("IRQ")))
 void hal_default_irq_hdlr(void)
 {
-	/* save regs and link */
-	asm volatile("stmfd sp!, {r0-r12, lr} \n");
-
 	u32 val = 0;
 	static u8 c = 33;
 	static u8 hr = 0, min = 0, sec = 0;
@@ -599,51 +629,75 @@ void hal_default_irq_hdlr(void)
 intr_xit:
 	/* allow pending/new IRQ's to occur */
 	WRITEREG32(INTC_CTRL, 1);
-
-	/* restore regs and link */
-	asm volatile ("ldmfd sp!, {r0-r12, lr} \n");
 	
 	/* re-enable RTC interrupts */
 	WRITEREG32(INTC_MIR2_CLEAR, 0x01 << 11);
-
-	/* return from IRQ -- see Cortex A8 TRM from ARM, section 2.15.1 */
-	asm volatile("subs pc, lr, #4 \n");
 }
 
-__attribute__ ((naked))
+u32 g_reg_cp15 = 0xDEADFACE;
+
+__attribute__ ((interrupt ("ABORT")))
 void hal_default_databort_hdlr(void)
 {
-	hal_uart_putstr("DATA ABORT ! \n");
+	u16 val = 0;
+	char *type = NULL;
+
+	/* read data fault status reg c5 in cp15 - ARM A8 TRM - 3.2.35 */
+	asm volatile(
+		"push {r5, r6} \n"
+		"ldr r5, =g_reg_cp15 \n"
+		"mrc p15, 0, r6, c5, c0, 0 \n"
+		"str r6, [r5] \n"
+		"pop {r5, r6} \n"
+	);
+	/* combine bits 0-3 and 10,12 to get fault number */
+	val = g_reg_cp15 & 0x140F;
+	val |= (val & 0x400) >> 6;
+	val |= (val & 0x1000) >> 7;
+	val &= 0x3F;
+	type = hal_get_fault_typestr(val);
+	
+	hal_uart_putstr("DATA ABORT ! \n type=");
+	hal_uart_put32(val);
+	hal_uart_putstr(type);
+	if (g_reg_cp15 & 0x800)
+		hal_uart_putstr("\ncaused by write access @ ");
+	else
+		hal_uart_putstr("\ncaused by read access @ ");
+	
+	/* read data fault addr. reg c6 in CP15 - ARM A8 TRM 3.2.38 */
+	asm volatile(
+		"push {r5, r6} \n"
+		"ldr r5, =g_reg_cp15 \n"
+		"mrc p15, 0, r6, c6, c0, 0 \n"
+		"str r6, [r5] \n"
+		"pop {r5, r6} \n"
+	);
+	
+	hal_uart_put32(g_reg_cp15);
 	hal_assert();
 }
 
-__attribute__ ((naked))
+__attribute__ ((interrupt ("ABORT")))
 void hal_default_progabort_hdlr(void)
 {
 	hal_uart_putstr("PROGRAM ABORT ! \n");
 	hal_assert();
 }
 
-__attribute__ ((naked))
+__attribute__ ((interrupt ("SWI")))
 void hal_default_swi_hdlr(void)
 {
-	/* save regs and link */
-	asm volatile("stmfd sp!, {r0-r12, lr} \n");
-	
 	hal_uart_putstr("SWI ! \n");
-
-	/* return from SWI -- see Cortex A8 TRM from ARM, section 2.15.8 */
-	asm volatile("mov pc, lr \n");
 }
 
-__attribute__ ((naked))
+__attribute__ ((interrupt ("UNDEF")))
 void hal_default_undef_hdlr(void)
 {
 	hal_uart_putstr("UNDEFINED INSTR ! \n");
 	hal_assert();
 }
 
-__attribute__ ((naked))
 void hal_default_reset_hdlr(void)
 {
 	hal_uart_putstr("RESET ! \n");
