@@ -33,18 +33,19 @@ This is a stage-1 bootloader which will do the following:
 6. Init RTC interrupts
 7. Relocate itself to RAM and begin looking for an OS image
    This will involve reading a file from a file system and is a 'TODO' future work.
-   For now durga will simply keep printing an ascii chart on the UART from the RTC interrupt handler
+   For now durga will simply keep printing the system up time 
+   and an ascii chart on the UART from the RTC interrupt handler every second.
 
-We shall keep adding code to Durga and fleshing it out as and when new modules are required.
+We shall keep adding code to durga and fleshing it out as and when new modules are required.
 For example - wall clock time, file system read, advanced intr handling,
 hdmi interfacing (to show boot progress on screen), etc..
 
-Another change is that the linker script has to be changed to force alignment of data and bss sections to
+Another change is that the linker script had to be modified to force alignment of data and bss sections to
 4-byte boundaries, otherwise if say a static u8 initialized variable is declared and the program
 has some other u8 global uninitialized variables, then this will cause the bss to start at non-4-btye boundaries
 leading to an exception when trying to zero out the bss in start.s
-No need to align .rodata, as it starts soon after the data section and hence will be automatically aligned
-since all instructions are 4 byte in ARM.
+However, there is no need to align .rodata, as it starts soon after the data section and hence will be automatically aligned
+since all instructions are 4 bytes in ARM.
 
 To build: 
 1) Make sure you have built the signgp utility first.
@@ -67,5 +68,5 @@ Output:
 2. usr1 led = 1; UART init has finished successfully
 3. usr2 led = 1; Stage1 loading sucessful
 3. usr3 led = toggles; Stage2 loading complete and durga has booted fully
-4. UART output = 'IRQ - RTC interrupt #75 - xx' -- keeps printing every sec
+4. UART output = 'IRQ - hh:mm:ss - x' -- keeps printing every sec
    implies, RTC and interrupt handlers are functional

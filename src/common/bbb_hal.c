@@ -4,6 +4,7 @@
 */
 
 #include "bbb_hal.h"
+#include "utils.h"
 
 #define INTR_TABLE_START 0x9FFFFFC0 /* 32 + 32 bytes below the end of RAM */
 
@@ -14,7 +15,7 @@ void hal_default_irq_hdlr(void);
 void hal_default_undef_hdlr();
 void hal_default_swi_hdlr();
 void hal_default_databort_hdlr();
-void hal_default_progabort_hdlr();
+void hal_default_prefetch_abort_hdlr();
 
 void hal_init_led()
 {
@@ -500,6 +501,12 @@ char *hal_get_fault_typestr(u16 fault)
 			return "L1 translation, precise parity error";
 		case L2_PARITY_ERROR:
 			return "L2 translation, precise parity error";
+		case AXI_EXT_NON_TRANS_ABORT:
+			return "AXI slave error, non-translation, precise external abort";
+		case AXI_L1_EXT_ABORT:
+			return "AXI slave error, L1 translation, precise external abort";
+		case AXI_L2_EXT_ABORT:
+			return "AXI slave error, L2 translation, precise external abort";
 	}
 	return "unknown fault !";
 }
@@ -546,6 +553,16 @@ void hal_init_platform_stage1()
 	* it will take long time to test all 512MB (around 20 min !)
 	*/
 	if (!hal_ram_test(0xDEADFACE, 1024 * 1024)) {
+		str[0] = '*'; str[1] ='R';
+		str[2] = 'A'; str[3] = 'M';
+		str[4] = ' '; str[5] = 'c';
+		str[6] = 'h'; str[7] = 'e';
+		str[8] = 'c'; str[9] = 'k';
+		str[10] = ' '; str[11] = 'f';
+		str[12] = 'a'; str[13] =  'i';
+		str[14] = 'l'; str[15] = '!';
+		str[16] = 0;
+		hal_uart_putstr(str);
 		hal_assert();
 	}
 
@@ -635,12 +652,24 @@ intr_xit:
 }
 
 u32 g_reg_cp15 = 0xDEADFACE;
+u32 g_fault_addr = 0xFACEDEAD;
 
 __attribute__ ((interrupt ("ABORT")))
 void hal_default_databort_hdlr(void)
 {
 	u16 val = 0;
 	char *type = NULL;
+
+	/* in case of data abort LR-4 gives the addr of the faulting instr
+	* - ARM A8 prog guide - 11.3.1
+	*/
+	asm volatile(
+		"push {r5, r6} \n"
+		"ldr r5, =g_fault_addr \n"
+		"sub r6, lr, #4 \n"
+		"str r6, [r5] \n"
+		"pop {r5, r6} \n"
+	);
 
 	/* read data fault status reg c5 in cp15 - ARM A8 TRM - 3.2.35 */
 	asm volatile(
@@ -657,13 +686,16 @@ void hal_default_databort_hdlr(void)
 	val &= 0x3F;
 	type = hal_get_fault_typestr(val);
 	
-	hal_uart_putstr("DATA ABORT ! \n type=");
+	hal_uart_putstr("=========DATA ABORT !========= \nc5 reg = ");
+	hal_uart_put32(g_reg_cp15);
+	hal_uart_putstr("fault type = ");
 	hal_uart_put32(val);
 	hal_uart_putstr(type);
 	if (g_reg_cp15 & 0x800)
 		hal_uart_putstr("\ncaused by write access @ ");
 	else
 		hal_uart_putstr("\ncaused by read access @ ");
+	
 	
 	/* read data fault addr. reg c6 in CP15 - ARM A8 TRM 3.2.38 */
 	asm volatile(
@@ -675,13 +707,71 @@ void hal_default_databort_hdlr(void)
 	);
 	
 	hal_uart_put32(g_reg_cp15);
+	hal_uart_putstr("fault caused by instruction @ ");
+	hal_uart_put32(g_fault_addr);
+	hal_uart_putstr("============================== \n");
 	hal_assert();
 }
 
 __attribute__ ((interrupt ("ABORT")))
-void hal_default_progabort_hdlr(void)
+void hal_default_prefetch_abort_hdlr(void)
 {
-	hal_uart_putstr("PROGRAM ABORT ! \n");
+	u16 val = 0;
+	char *type = NULL;
+
+	/* in case of prefetch abort LR-8 gives the addr of the faulting instr
+	* - ARM A8 prog guide - 11.3.1
+	*/
+	asm volatile(
+		"push {r5, r6} \n"
+		"ldr r5, =g_fault_addr \n"
+		"sub r6, lr, #8 \n"
+		"str r6, [r5] \n"
+		"pop {r5, r6} \n"
+	);
+
+	/* read instr fault status reg c5 in cp15 - ARM A8 TRM - 3.2.36
+	* note the '1' at the end of the mrc instr, its not the same as
+	* reading the data fault status reg !
+	*/
+	asm volatile(
+		"push {r5, r6} \n"
+		"ldr r5, =g_reg_cp15 \n"
+		"mrc p15, 0, r6, c5, c0, 1 \n"
+		"str r6, [r5] \n"
+		"pop {r5, r6} \n"
+	);
+	/* combine bits 0-3 and 10,12 to get fault number */
+	val = g_reg_cp15 & 0x140F;
+	val |= (val & 0x400) >> 6;
+	val |= (val & 0x1000) >> 7;
+	val &= 0x3F;
+	type = hal_get_fault_typestr(val);
+	
+	hal_uart_putstr("=========PREFETCH ABORT !========= \nc5 reg = ");
+	hal_uart_put32(g_reg_cp15);
+	hal_uart_putstr("fault type = ");
+	hal_uart_put32(val);
+	hal_uart_putstr(type);
+	hal_uart_putstr("\ncaused by trying to fetch instruction @ ");
+
+	/* read instr fault addr. reg c6 in CP15 - ARM A8 TRM 3.2.39
+	* note the '2' at the end of the mrc instr, its not the same as
+	* reading the data fault addr reg !
+	*/
+	asm volatile(
+		"push {r5, r6} \n"
+		"ldr r5, =g_reg_cp15 \n"
+		"mrc p15, 0, r6, c6, c0, 2 \n"
+		"str r6, [r5] \n"
+		"pop {r5, r6} \n"
+	);
+	
+	hal_uart_put32(g_reg_cp15);
+	hal_uart_putstr("fault caused by instruction @ ");
+	hal_uart_put32(g_fault_addr);
+	hal_uart_putstr("============================== \n");
+	hal_assert();
 	hal_assert();
 }
 
@@ -694,7 +784,22 @@ void hal_default_swi_hdlr(void)
 __attribute__ ((interrupt ("UNDEF")))
 void hal_default_undef_hdlr(void)
 {
-	hal_uart_putstr("UNDEFINED INSTR ! \n");
+	u32 *instr = NULL;
+	/* in case of undef exception LR-4 gives the addr of the faulting instr	*/
+	asm volatile(
+		"push {r5, r6} \n"
+		"ldr r5, =g_fault_addr \n"
+		"sub r6, lr, #4 \n"
+		"str r6, [r5] \n"
+		"pop {r5, r6} \n"
+	);
+	instr = (u32 *)g_fault_addr;
+	hal_uart_putstr("============UNDEFINED INSTRUCTION !========= \n");
+	hal_uart_putstr("caused by trying to decode instruction: ");
+	hal_uart_put32(*instr);
+	hal_uart_putstr("at address: ");
+	hal_uart_put32(g_fault_addr);
+	hal_uart_putstr("============================================ \n");
 	hal_assert();
 }
 
@@ -785,7 +890,7 @@ void hal_init_platform_stage2()
 	hal_register_exception_handler(EXCEPTION_RESET, (u32 *)hal_default_reset_hdlr);
 	hal_register_exception_handler(EXCEPTION_UNDEF, (u32 *)hal_default_undef_hdlr);
 	hal_register_exception_handler(EXCEPTION_SWI, (u32 *)hal_default_swi_hdlr);
-	hal_register_exception_handler(EXCEPTION_PROGABORT, (u32 *)hal_default_progabort_hdlr);
+	hal_register_exception_handler(EXCEPTION_PREFETCH_ABORT, (u32 *)hal_default_prefetch_abort_hdlr);
 	hal_register_exception_handler(EXCEPTION_DATABORT, (u32 *)hal_default_databort_hdlr);
 	hal_register_exception_handler(EXCEPTION_IRQ, (u32 *)hal_default_irq_hdlr);
 	hal_register_exception_handler(EXCEPTION_FIQ, (u32 *)hal_default_fiq_hdlr);

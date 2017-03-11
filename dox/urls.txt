@@ -21,3 +21,4 @@ http://processors.wiki.ti.com/index.php/AM335x_board_bringup_tips#DDR_configurat
 http://stackoverflow.com/questions/17665505/why-does-my-swi-instruction-hang-beaglebone-black-arm-cortex-a8-cpu
 http://www.jariellecatbagan.com/the-theory-behind-external-ddr3-initialization-on-the-beaglebone-black/
 http://www.rampedia.com/index.php
+http://www.drdobbs.com/how-to-use-arms-data-abort-exception/192300809
