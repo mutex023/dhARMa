@@ -31,7 +31,7 @@ This is a stage-1 bootloader which will do the following:
 	
 4. Setup stack on RAM
 6. Init RTC interrupts
-7. Relocate itself to RAM and begin looking for an OS image
+7. Relocate itself to RAM and begin looking for an OS image or a stage-2 bootloader.
    This will involve reading a file from a file system and is a 'TODO' future work.
    For now durga will simply keep printing the system up time 
    and an ascii chart on the UART from the RTC interrupt handler every second.
