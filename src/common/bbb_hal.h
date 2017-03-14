@@ -40,6 +40,7 @@
 #define INT_VEC_BASE_RAM 0x4030CE00
 #define INT_VEC_BASE_ROM 0x20000
 #define INT_IRQ_DEFAULT_HDLR 0x4030CE18
+#define INT_MAX_IRQS 128
 
 #define RTC_CTRL_REG 0X44E3E040
 #define RTC_STATUS_REG 0X44E3E044
@@ -214,6 +215,12 @@ typedef enum {
 	AXI_L2_EXT_ABORT = 0x2E,	
 } fault_type_t;
 
+typedef void (*fp_irq_hdlr_t)(void *data);
+typedef struct {
+	fp_irq_hdlr_t irq_hdlr_fn;
+	void *data;
+} irq_hdlr_t;
+
 /* prototypes API*/
 void hal_init_led();
 void hal_usr_led_on(u8 led_num);
@@ -229,7 +236,10 @@ void hal_uart_putchar(u8 val);
 void hal_uart_putstr(char *str);
 void hal_uart_put32(u32 val);
 void hal_init_uart();
+void hal_disable_intr();
+void hal_enable_intr();
 void hal_register_exception_handler(exception_type_t type, u32 *handler);
+int hal_register_irq_handler(u8 intr_num, fp_irq_hdlr_t handler, void *data);
 void hal_delay(u32 sec);
 void hal_assert();
 

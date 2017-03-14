@@ -17,6 +17,8 @@ void hal_default_swi_hdlr();
 void hal_default_databort_hdlr();
 void hal_default_prefetch_abort_hdlr();
 
+irq_hdlr_t g_irq_table[INT_MAX_IRQS];
+
 void hal_init_led()
 {
 	u32 val = 0;
@@ -299,9 +301,16 @@ u8 hal_ram_test(u32 val, u64 size)
 
 void hal_init_intr(u32 intr_num, intr_type_t intr_type, u8 priority)
 {
+	u32 val = 0;
+
     /* set free running interrupt ctrl clock -- TRM 6.5.1.2/8 */
-	WRITEREG32(INTC_SYSCONFING, 0);
-	WRITEREG32(INTC_IDLE, 0x01);
+	val = READREG32(INTC_SYSCONFING);
+	if (val != 0)
+		WRITEREG32(INTC_SYSCONFING, 0);
+
+	val = READREG32(INTC_IDLE);
+	if (val != 0x1)
+		WRITEREG32(INTC_IDLE, 0x01);
 	
 	/* set priority and type(fiq/irq) for the interrupt -- TRM 6.5.1.44 */
     WRITEREG32(INTC_ILR_BASE + (intr_num * 4), ((priority << 2) | intr_type));
@@ -595,60 +604,28 @@ __attribute__ ((interrupt ("IRQ")))
 void hal_default_irq_hdlr(void)
 {
 	u32 val = 0;
-	static u8 c = 33;
-	static u8 hr = 0, min = 0, sec = 0;
 
 	/* ignore spurious interrupts -- TRM 6.5.1.4 */
 	val = READREG32(INTC_SIR_IRQ);
 	if (val & 0xFFFFFF80)
 		goto intr_xit;
-  
-	/* get the interrupt number and check if it is from RTC -- TRM 6.5.1.4 */
-	if ((val & 0x7F) != RTC_INTR_NUM)
+	
+	/* chk the irq number - TRM 6.5.1.4 */
+	val &= 0x7F;
+	if (val >= INT_MAX_IRQS)
 		goto intr_xit;
+	
+	/* jmp to specific IRQ handler */
+	if (g_irq_table[val].irq_hdlr_fn)
+		g_irq_table[val].irq_hdlr_fn(g_irq_table[val].data);
+	else {
+		hal_uart_putstr("No handler for IRQ - ");
+		hal_uart_put32(val);
+	}
 
-	/* disable RTC interrupts till you process current interrupt
-	 * for this, set the interrupt mask bit for the RTC interrupt
-	 * - i.e, the 11th bit in MIR2, bits0-63 are in MIR0-1 -- TRM 6.3 & 6.5.1.31
-	*/
-	WRITEREG32(INTC_MIR2_SET, 0x01 << 11);
-
-	/* process the interrupt - print to uart an ascii chart 
-	 * and system up time 
-	*/
-	++sec;
-	if (sec >= 60) {
-		sec = 0;
-		++min;
-		if (min >= 60) {
-			min = 0;
-			++hr;
-			if (hr >= 24) {
-				hr = 0;
-			}
-		}
-	} 
-	hal_uart_putstr("IRQ - ");
-	hal_uart_putchar(hr/10 + '0');
-	hal_uart_putchar(hr%10 + '0');
-	hal_uart_putchar(':');
-	hal_uart_putchar(min/10 + '0');
-	hal_uart_putchar(min%10 + '0');
-	hal_uart_putchar(':');
-	hal_uart_putchar(sec/10 + '0');
-	hal_uart_putchar(sec%10 + '0');
-	hal_uart_putstr(" - ");
-	hal_uart_putchar(c++);
-	hal_uart_putchar('\n');
-	if (c > 126)
-		c = 33;
-  
 intr_xit:
 	/* allow pending/new IRQ's to occur */
 	WRITEREG32(INTC_CTRL, 1);
-	
-	/* re-enable RTC interrupts */
-	WRITEREG32(INTC_MIR2_CLEAR, 0x01 << 11);
 }
 
 u32 g_reg_cp15 = 0xDEADFACE;
@@ -835,6 +812,18 @@ void hal_register_exception_handler(exception_type_t type, u32 *handler)
 	*p = (u32)handler;	
 }
 
+int hal_register_irq_handler(u8 intr_num, fp_irq_hdlr_t handler, void *data)
+{
+	if (intr_num >= INT_MAX_IRQS || !handler)
+		return -1;
+	
+	hal_disable_intr();
+	g_irq_table[intr_num].irq_hdlr_fn = handler;
+	g_irq_table[intr_num].data = data;
+	hal_enable_intr();
+	return 0;
+}
+
 void hal_disable_intr()
 {
 	asm volatile (
@@ -864,6 +853,8 @@ void hal_init_platform_stage2()
 {
 	u32 *p32 = NULL, *f32 = NULL;
 	int i = 0;
+	
+	memset(g_irq_table, 0, sizeof(g_irq_table));
 
 	hal_uart_putstr("DURGA stage 2 is loading.... \n");
 	hal_uart_putstr("set VBAR...\n");

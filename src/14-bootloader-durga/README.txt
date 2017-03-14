@@ -37,8 +37,7 @@ This is a stage-1 bootloader which will do the following:
    and an ascii chart on the UART from the RTC interrupt handler every second.
 
 We shall keep adding code to durga and fleshing it out as and when new modules are required.
-For example - wall clock time, file system read, advanced intr handling,
-hdmi interfacing (to show boot progress on screen), etc..
+For example - file system read, hdmi interfacing (to show boot progress on screen), etc..
 
 Another change is that the linker script had to be modified to force alignment of data and bss sections to
 4-byte boundaries, otherwise if say a static u8 initialized variable is declared and the program
@@ -68,5 +67,5 @@ Output:
 2. usr1 led = 1; UART init has finished successfully
 3. usr2 led = 1; Stage1 loading sucessful
 3. usr3 led = toggles; Stage2 loading complete and durga has booted fully
-4. UART output = 'IRQ - hh:mm:ss - x' -- keeps printing every sec
-   implies, RTC and interrupt handlers are functional
+4. UART output = 'RTC - hh:mm:ss - x' -- keeps printing every sec, once the rtc handler is registered from durga.c.
+   This implies that the RTC and interrupt handlers are functional
