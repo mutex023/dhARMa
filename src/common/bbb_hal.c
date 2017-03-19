@@ -481,7 +481,7 @@ char *hal_get_fault_typestr(u16 fault)
 		case SEC_ACCESS_FAULT:
 			return "section access flag fault";
 		case INSTR_CACHE_FAULT:
-			return "instruction cache maintainence fault";
+			return "instruction cache maintenance fault";
 		case SEC_TRANS_FAULT:
 			return "section translation fault";
 		case PAGE_ACCESS_FAULT:

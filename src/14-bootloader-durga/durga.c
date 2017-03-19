@@ -1,16 +1,23 @@
 /* 'main' function of durga
-* currently does nothing but print a line to uart and toggle led3
+* currently durga only prints the system time and ascii chart
+* from the interrupt handler to the uart and toggle led3
 * @author: muteX023
 */
 
 #include "../common/bbb_hal.h"
+#include "../common/bbb_hal_mmc.h"
 
 void rtc_intr_hdlr (void *data);
 
 void main()
 {
 	int cnt = 4;
+
 	hal_uart_putstr("DURGA has booted \n");
+	if (hal_mmc_init())
+		hal_uart_putstr("error initializing mmc !\n");
+	if (hal_mmc_sdcard_init())
+		hal_uart_putstr("error initializing sd card !\n");
 	while(1) {
 		//toggle usr3 led
 		hal_usr_led_toggle(3);
